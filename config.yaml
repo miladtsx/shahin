@@ -1,9 +1,10 @@
 video_path: res/sample_1.mp4
 output_dir: out/frames
-frame_skip: 120
+frame_skip: 25
 vehicle_classes:
   - car
   - bus
   - truck
   - motorcycle
 model_path: res/yolo11n.pt
+iou_threshold: 0.3

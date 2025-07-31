@@ -19,10 +19,11 @@ class VehicleDetector:
                 output.append({"cls": cls_name, "conf": conf, "bbox": (x1, y1, x2, y2)})
         return output
 
-    def draw(self, frame, detections):
-        for det in detections:
+    def draw(self, frame, tracked_boxes):
+        for det in tracked_boxes:
+            car_id = det.get('id', '-1')
             x1, y1, x2, y2 = det["bbox"]
-            label = f"{det['cls']} {det['conf']:.2f}"
+            label = f"ID:{car_id} {det['cls']} {det['conf']:.2f}"
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(
                 frame,
