@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+output_frames/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application
+out/
+res/yolo11n.pt
+res/sample_1.mp4
