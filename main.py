@@ -1,6 +1,6 @@
 #!/run/media/dev/SSD/labs/ai/shahin/.venv/bin/python3
 import yaml
-from src.detect_vehicle import run_vehicle_detection
+from src.detect_vehicle import run_plate_detection
 
 
 def load_config(path="config.yaml"):
@@ -9,13 +9,12 @@ def load_config(path="config.yaml"):
 
 def main():
     config = load_config()
-    print("🚗 Starting vehicle detection pipeline...")
-    run_vehicle_detection(config)
-    print("✅ Vehicle detection complete.")
+    print("🚗 Starting Plate detection pipeline...")
+    run_plate_detection(config)
+    print("✅ Plate detection complete.")
 
-    # 🔜 TODO: Track vehicles across frames
-    # 🔜 TODO: Detect license plates inside each box
-    # 🔜 TODO: Score & select best frame per vehicle
+    # 🔜 TODO: Track plates across frames
+    # 🔜 TODO: Score & select best frame per plate
     # 🔜 TODO: Upload selected frame to remote OCR
 
 if __name__ == "__main__":

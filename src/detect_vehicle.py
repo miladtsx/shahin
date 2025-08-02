@@ -1,57 +1,92 @@
-from src.detectors.vehicle_detector import VehicleDetector
-from src.io_utils.video_loader import VideoLoader
-from src.tracker.simple_tracker import SimpleTracker
 import os
 import cv2
+from .detectors.vehicle_detector import VehicleDetector
+from src.detectors.plate_detector import PlateDetector
+from src.tracker.simple_tracker import PlateTracker
+from src.selector.best_frame_selector import BestFrameSelector
+from src.score.score import score_quality
+from src.io_utils.video_loader import VideoLoader
 
-def run_vehicle_detection(config):
-    # Setup
+
+def run_plate_detection(config):
+    # Load config
     video_path = config["video_path"]
     output_dir = config["output_dir"]
-    frame_skip = config["frame_skip"]
+    model_vehicle = config["model_vehicle"]
+    model_plate = config["model_plate"]
+    frame_skip = config.get("frame_skip", 1)
     vehicle_classes = config["vehicle_classes"]
-    model_path = config["model_path"]
-    iou_threshold = config["iou_threshold"]
+    plate_classes = config["plate_classes"]
+    # iou_threshold = config.get("iou_threshold", 0.7)
 
-    # Create output directory
+    # Init
+    loader = VideoLoader(video_path)
+    detector_vehicle = VehicleDetector(model_vehicle, vehicle_classes)
+    detector_plate = PlateDetector(model_plate, plate_classes)
+    tracker = PlateTracker()
+    selector = BestFrameSelector(score_quality)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Initialize
-    loader = VideoLoader(video_path)
-    detector = VehicleDetector(model_path, vehicle_classes)
-    tracker = SimpleTracker(iou_threshold=iou_threshold)
-
     frame_count = 0
-    saved_count = 0
-
     for frame in loader:
-        if frame_count % frame_skip == 0:
-            boxes = detector.detect(frame)
-            tracked_boxes = tracker.update(boxes)
-            annotated_frame = detector.draw(frame.copy(), tracked_boxes)
+        if frame_count % frame_skip != 0:
+            frame_count += 1
+            continue
 
-            # Save full annotated frame for visualization (optional)
-            cv2.imwrite(
-                os.path.join(output_dir, f"frame_{frame_count}.jpg"), annotated_frame
-            )
+        # 1. Detect & Track Vehicles
+        vehicles = detector_vehicle.detect(frame)
+        tracked = tracker.update(vehicles, frame, frame_count)
 
-            # Save each tracked vehicle's annotated frame
-            for det in tracked_boxes:
-                car_id = det.get("id", "-1")
-                x1, y1, x2, y2 = det["bbox"]
+        for vehicle in tracked:
+            vid = vehicle["id"]
+            x1, y1, x2, y2 = vehicle["bbox"]
+            vh_crop = frame[y1:y2, x1:x2]
 
-                # Crop vehicle region
-                vehicle_crop = frame[y1:y2, x1:x2]
+            # 2. Detect Plate inside Vehicle Crop
+            plates = detector_plate.detect(vh_crop)
+            if not plates:
+                continue
 
-                # Save to a per-ID folder
-                id_dir = os.path.join(output_dir, f"ID_{car_id}")
-                os.makedirs(id_dir, exist_ok=True)
+            plate_crop = None
+            best_score = -1
+            best_crop = None
+            for plate in plates:
+                px1, py1, px2, py2 = plate["bbox"]
+                pw, ph = px2 - px1, py2 - py1
+                if pw * ph < 1500:
+                    continue  # skip tiny plates
 
-                crop_filename = os.path.join(id_dir, f"frame_{frame_count}.jpg")
-                cv2.imwrite(crop_filename, vehicle_crop)
+                # Sanity check plate aspect ratio:
+                aspect_ratio = pw / ph
+                if aspect_ratio < 1.5 or aspect_ratio > 6.0:
+                    continue
 
-            saved_count += 1
+                plate_crop = vh_crop[py1:py2, px1:px2]
+
+                if plate_crop.size == 0:
+                    continue
+
+                score = score_quality(plate_crop)
+                print(f"[Vehicle {vid} | Frame {frame_count}] Plate crop size: {plate_crop.shape[:2]}, Score: {score:.2f}")
+
+                if score > best_score:
+                    best_score = score
+                    best_crop = plate_crop
+
+            if best_crop is not None:
+                selector.update(vid, best_crop)
+                print(f"[Vehicle {vid} | Frame {frame_count}] ✅ Best score this frame: {best_score:.2f}")
+
+
+            # 3. Score Sharpness
+            if plate_crop is not None:
+                selector.update(vid, plate_crop)
 
         frame_count += 1
 
-    print(f"✅ Done! {saved_count} frames saved to {output_dir}")
+    # 4. Save best plates
+    for vid, best_plate in selector.get_best_frames().items():
+        path = os.path.join(output_dir, f"Vehicle_{vid}_best_plate.jpg")
+        cv2.imwrite(path, best_plate)
+
+    print(f"✅ Done. Saved best plate for {len(selector.best_frames)} vehicles.")

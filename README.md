@@ -1,14 +1,14 @@
 
 # Vehicle Plate Tracker - Extract Plate Image
 
-A preprocessing pipeline to extract the best frame(s) per vehicle from high frame-rate gate entry videos. These frames can be used for accurate license plate recognition via a remote OCR service.
+Select the sharpest, best-quality frame of each unique license plate from a 120 FPS video stream.
 
 ## Features
 
-- YOLO-based vehicle detection
-- Frame skipping to reduce compute
-- Visual annotation of detected vehicles
-- Output saved frames for downstream OCR
+- High frame-rate input (120 FPS).
+- One output per unique plate (best frame).
+- Accuracy > speed.
+- Asynchronous-friendly pipeline.
 
 ## Requirements
 
