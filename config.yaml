@@ -1,6 +1,6 @@
 video_path: res/shahin.mp4
 output_dir: out/
-frame_skip: 24
+frame_skip: 1
 vehicle_classes:
   - car
   - bus
@@ -10,4 +10,6 @@ plate_classes:
   - license_plate
 model_plate: res/models/license_plate_detector.pt
 model_vehicle: res/models/vehicle_detector.pt
-iou_threshold: 0.1
+car_detection_threshold: 0.6
+plate_detection_threshold: 0.5
+crop_dimension_threshold: 2400

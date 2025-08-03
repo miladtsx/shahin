@@ -7,13 +7,15 @@ class VehicleDetector:
         self.allowed = set(allowed_classes)
         self.class_names = self.model.names
 
-    def detect(self, frame):
+    def detect(self, frame, conf_threshold=0.5):
         results = self.model(frame)[0]
         output = []
         for box in results.boxes:
             cls_id = int(box.cls)
             cls_name = self.class_names[cls_id]
             conf = float(box.conf)
+            if conf < conf_threshold:
+                continue
             if cls_name in self.allowed:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 output.append({"cls": cls_name, "conf": conf, "bbox": (x1, y1, x2, y2)})
