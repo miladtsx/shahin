@@ -8,6 +8,8 @@ class PlateDetector:
         self.class_names = self.model.names
 
     def detect(self, frame, conf_threshold=0.8):
+        if frame.size == 0:
+            return []
         results = self.model(frame)[0]
         output = []
         for box in results.boxes:

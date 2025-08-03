@@ -1,11 +1,11 @@
 video_path: res/shahin.mp4
 output_dir: out/
-frame_skip: 1
+frame_skip: 10
 vehicle_classes:
-  - car
-  - bus
-  - truck
-  - motorcycle
+  - 2 #car
+  - 3 #motorcycle
+  - 5 #bus
+  - 7 #truck
 plate_classes:
   - license_plate
 model_plate: res/models/license_plate_detector.pt

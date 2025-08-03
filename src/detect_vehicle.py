@@ -1,10 +1,11 @@
 import os
 import cv2
+import numpy as np
 from src.detectors.vehicle_detector import VehicleDetector
 from src.detectors.plate_detector import PlateDetector
-from src.tracker.simple_tracker import PlateTracker
 from src.selector.best_frame_selector import BestFrameSelector
 from src.score.score import score_quality
+from src.tracker.sort.sort import Sort
 from src.io_utils.video_loader import VideoLoader
 
 
@@ -18,7 +19,7 @@ def run_plate_detection(config):
         config["model_vehicle"], config["vehicle_classes"]
     )
     detector_plate = PlateDetector(config["model_plate"], config["plate_classes"])
-    tracker = PlateTracker()
+    tracker = Sort()
     selector = BestFrameSelector(score_quality)
     os.makedirs(output_dir, exist_ok=True)
 
@@ -29,18 +30,35 @@ def run_plate_detection(config):
             continue
 
         # 1. Detect & Track Vehicles
-        vehicles = detector_vehicle.detect(frame, conf_threshold=config["car_detection_threshold"])
-        if not len(vehicles):
+        vehicles = detector_vehicle.detect(
+            frame, conf_threshold=config["car_detection_threshold"]
+        )
+        if not vehicles or not len(vehicles):
             continue
-        tracked = tracker.update(vehicles, frame, frame_count)
 
-        for vehicle in tracked:
+        # Track vehicles
+        # Convert to numpy array for SORT tracker
+        # Each vehicle is represented as [x1, y1, x2, y2, score]
+        # where (x1, y1) is the top-left corner and (x2, y2) is the bottom-right corner
+        # score is the confidence score of the detection
+        dets_np = np.array(vehicles, dtype=np.float64).reshape(-1, 5)
+        tracked = tracker.update(dets_np)
+
+        # Convert to dict format
+        tracked_dicts = []
+        for trk in tracked:
+            x1, y1, x2, y2, track_id = map(int, trk)
+            tracked_dicts.append({"id": track_id, "bbox": (x1, y1, x2, y2)})
+
+        for vehicle in tracked_dicts:
             vid = vehicle["id"]
             x1, y1, x2, y2 = vehicle["bbox"]
             vh_crop = frame[y1:y2, x1:x2]
 
             # 2. Detect Plate inside Vehicle Crop
-            plates = detector_plate.detect(vh_crop, conf_threshold=config["plate_detection_threshold"])
+            plates = detector_plate.detect(
+                vh_crop, conf_threshold=config["plate_detection_threshold"]
+            )
             if not plates:
                 continue
 
