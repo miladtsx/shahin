@@ -1,0 +1,153 @@
+import os
+import cv2
+import numpy as np
+from typing import List, Tuple
+
+
+class PlateSegmention:
+    def __init__(
+        self,
+        input_dir: str,
+        output_dir: str,
+    ):
+        self.input_dir = input_dir
+        self.output_dir = output_dir
+
+    def _save_debug(self, image, filename, tag):
+        os.makedirs(f"debug/segmentation/{filename}", exist_ok=True)
+        cv2.imwrite(f"debug/segmentation/{filename}/{tag}.jpg", image)
+
+    def _resize_and_pad(
+        self, image: np.ndarray, size: Tuple[int, int] = (32, 32)
+    ) -> np.ndarray:
+        """Resize while preserving aspect ratio and pad with zeros to fixed size."""
+        h, w = image.shape
+        scale = min(size[0] / h, size[1] / w)
+        new_w, new_h = int(w * scale), int(h * scale)
+        resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        canvas = np.zeros(size, dtype=np.uint8)
+        x_offset = (size[1] - new_w) // 2
+        y_offset = (size[0] - new_h) // 2
+        canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
+        return canvas
+
+    def _merge_dots_into_glyphs(
+        self, boxes: List[Tuple[int, int, int, int]]
+    ) -> List[Tuple[int, int, int, int]]:
+        """
+        Merge small boxes (dots) into larger glyph boxes.
+        """
+        merged = []
+        used = set()
+
+        sorted_boxes = sorted(
+            enumerate(boxes), key=lambda x: x[1][2] * x[1][3], reverse=True
+        )
+
+        for i, (x1, y1, w1, h1) in sorted_boxes:
+            if i in used:
+                continue
+
+            x1c = x1 + w1 // 2
+            y1c = y1 + h1 // 2
+            big_box = (x1, y1, w1, h1)
+
+            for j, (x2, y2, w2, h2) in sorted_boxes:
+                if j == i or j in used:
+                    continue
+
+                area1 = w1 * h1
+                area2 = w2 * h2
+                if area2 > 0.25 * area1:
+                    continue  # not a dot
+
+                x2c = x2 + w2 // 2
+                y2c = y2 + h2 // 2
+
+                x_overlap = abs(x1c - x2c) < max(w1, w2)
+                y_distance = abs(y2c - y1c)
+                vertically_close = y_distance < h1
+
+                if x_overlap and vertically_close:
+                    x_min = min(x1, x2)
+                    y_min = min(y1, y2)
+                    x_max = max(x1 + w1, x2 + w2)
+                    y_max = max(y1 + h1, y2 + h2)
+                    big_box = (x_min, y_min, x_max - x_min, y_max - y_min)
+                    used.add(j)
+
+            used.add(i)
+            merged.append(big_box)
+
+        return merged
+
+    def _segment_glyphs(self, image_path: str) -> List[np.ndarray]:
+        """Returns list of 8 cropped glyph images."""
+        image = cv2.imread(image_path)
+        filename = os.path.splitext(os.path.basename(image_path))[0]
+
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # type: ignore
+        _, thresh = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY_INV)
+
+        contours, _ = cv2.findContours(
+            thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+
+        raw_boxes = []
+        for c in contours:
+            x, y, w, h = cv2.boundingRect(c)
+            area = cv2.contourArea(c)
+            aspect_ratio = w / h
+
+            if area < 100:
+                continue
+            if aspect_ratio < 0.2 or aspect_ratio > 1.5:
+                continue
+
+            raw_boxes.append((x, y, w, h))
+
+        # 🔧 Apply dot merging
+        merged_boxes = self._merge_dots_into_glyphs(raw_boxes)
+        boxes = sorted(merged_boxes, key=lambda b: b[0])
+
+        debug_img = image.copy()  # type: ignore
+        for x, y, w, h in boxes:
+            cv2.rectangle(debug_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+        self._save_debug(debug_img, filename, "merged_boxes")
+
+        glyphs = []
+        for idx, (x, y, w, h) in enumerate(boxes):
+            crop = thresh[y : y + h, x : x + w]
+            glyph = self._resize_and_pad(crop, (32, 32))
+            glyphs.append(glyph)
+            self._save_debug(glyph, filename, f"glyph_{idx}")
+
+        # Normalize to 8
+        if len(glyphs) > 8:
+            glyphs = glyphs[:8]
+        elif len(glyphs) < 8:
+            glyphs += [np.zeros((32, 32), dtype=np.uint8)] * (8 - len(glyphs))
+
+        return glyphs
+
+    def segment(self):
+        """Segment all images in the output directory."""
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        for filename in os.listdir(self.input_dir):
+            if not filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                continue
+
+            image_path = os.path.join(self.input_dir, filename)
+            glyphs = self._segment_glyphs(image_path)
+
+            for idx, glyph in enumerate(glyphs):
+                dir_path = os.path.join(
+                    self.output_dir, f"{os.path.splitext(filename)[0]}"
+                )
+                os.makedirs(dir_path, exist_ok=True)
+                output_path = os.path.join(
+                    dir_path, f"_glyph_{idx}.png"
+                )
+                cv2.imwrite(output_path, glyph)
