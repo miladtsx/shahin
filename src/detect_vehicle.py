@@ -11,7 +11,7 @@ from src.io_utils.video_loader import VideoLoader
 
 def run_plate_detection(config):
 
-    output_dir = config["output_dir"]
+    output_dir = config["detected_plates_dir"]
 
     # Init
     loader = VideoLoader(config["video_path"])
@@ -69,6 +69,7 @@ def run_plate_detection(config):
                 px1, py1, px2, py2 = plate["bbox"]
                 pw, ph = px2 - px1, py2 - py1
 
+                px1, py1, px2, py2 = shrink_box(px1, py1, px2, py2)
                 plate_crop = vh_crop[py1:py2, px1:px2]
                 if plate_crop.size == 0:
                     continue  # Avoid passing empty arrays to imshow
@@ -115,3 +116,12 @@ def run_plate_detection(config):
         cv2.imwrite(path, best_plate)
 
     print(f"✅ Done. Saved best plate for {len(selector.best_frames)} vehicles.")
+
+# Shrink box by a fixed margin percentage
+def shrink_box(x1, y1, x2, y2, shrink_ratio=0.5):
+    w = x2 - x1
+    h = y2 - y1
+    dxl = int(w * 0.14)
+    dxr = int(w * 0.06)
+    dy = int(h * 0.23)
+    return x1 + dxl, y1 + dy, x2 - dxr, y2 - dy
