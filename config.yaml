@@ -1,5 +1,7 @@
 video_path: res/shahin.mp4
-output_dir: out/
+detected_plates_dir: out/detected_plates/
+preprocessed_plates_dir: out/preprocessed_plates/
+segmentation_output_dir: out/segmentation/
 frame_skip: 10
 vehicle_classes:
   - 2 #car
