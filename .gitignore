@@ -15,5 +15,6 @@ Thumbs.db
 
 # Application
 out/
-res/yolo11n.pt
-res/sample_1.mp4
+res/data/sample_video
+res/data/raw_plate
+res/data/synthetic
