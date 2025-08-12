@@ -18,3 +18,5 @@ out/
 res/data/sample_video
 res/data/raw_plate
 res/data/synthetic
+
+debug

@@ -20,7 +20,7 @@ def preprocess_plates(config):
     print("📈 Starting preprocessing...")
     preprocessor = PlatePreprocessor(
         input_dir=config["detected_plates_dir"],
-        output_dir=config["preprocessed_plates_dir"]
+        output_dir=config["preprocessed_plates_dir"],
     )
     preprocessor.preprocess()
 
@@ -30,7 +30,7 @@ def segmentation(config):
     print("📈 Starting Segmentation...")
     segmentation = PlateSegmention(
         input_dir=config["preprocessed_plates_dir"],
-        output_dir=config["segmentation_output_dir"]
+        output_dir=config["segmentation_output_dir"],
     )
     segmentation.segment()
 
