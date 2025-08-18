@@ -24,6 +24,21 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Demo Setup
 
+- Download [MediaMTX](https://github.com/bluenviron/mediamtx/releases)
+
+```sh
+$ ./mediamtx
+```
+
+In another terminal, stream the sample video (acting as the input camera):
+```sh
+$ ffmpeg -re -stream_loop -1 -i output_1080p_120fps.mp4 -c copy -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/live.stream
+```
+Then run:
+```sh
+$ ./main.py
+```
 ## Document
 [link](https://docs.google.com/document/d/1_Q-legmeUw9Q5sP0G9K7ayoIYyhgSnebhKUnHNxscoQ/edit?tab=t.0#heading=h.z6ne0og04bp5)
