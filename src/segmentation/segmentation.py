@@ -2,16 +2,16 @@ import os
 import cv2
 import numpy as np
 from typing import List, Tuple
+from src.common_utils.config import Config
 
 
 class PlateSegmention:
     def __init__(
         self,
-        input_dir: str,
-        output_dir: str,
     ):
-        self.input_dir = input_dir
-        self.output_dir = output_dir
+        conf = Config().config
+        self.input_dir = conf.get("preprocessed_plates_dir")
+        self.output_dir = conf.get("segmentation_output_dir")
 
     def _save_debug(self, image, filename, tag):
         os.makedirs(f"debug/segmentation/{filename}", exist_ok=True)
@@ -131,12 +131,30 @@ class PlateSegmention:
 
         return glyphs
 
-    def segment(self):
+    def segment(self, file_name):
+        """Segment all images in the output directory."""
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        if not file_name.lower().endswith((".jpg", ".jpeg", ".png")):
+            return
+
+        image_path = os.path.join(self.input_dir, file_name)
+        glyphs = self._segment_glyphs(image_path)
+
+        for idx, glyph in enumerate(glyphs):
+            dir_path = os.path.join(
+                self.output_dir, f"{os.path.splitext(file_name)[0]}"
+            )
+            os.makedirs(dir_path, exist_ok=True)
+            output_path = os.path.join(dir_path, f"_glyph_{idx}.png")
+            cv2.imwrite(output_path, glyph)
+
+    def segment_bulk(self):
         """Segment all images in the output directory."""
         os.makedirs(self.output_dir, exist_ok=True)
 
         for filename in os.listdir(self.input_dir):
-            if not filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+            if not filename.lower().endswith((".jpg", ".jpeg", ".png")):
                 continue
 
             image_path = os.path.join(self.input_dir, filename)
@@ -147,7 +165,5 @@ class PlateSegmention:
                     self.output_dir, f"{os.path.splitext(filename)[0]}"
                 )
                 os.makedirs(dir_path, exist_ok=True)
-                output_path = os.path.join(
-                    dir_path, f"_glyph_{idx}.png"
-                )
+                output_path = os.path.join(dir_path, f"_glyph_{idx}.png")
                 cv2.imwrite(output_path, glyph)

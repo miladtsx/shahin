@@ -1,37 +1,36 @@
-import os
-import cv2
 import numpy as np
 from src.detectors.vehicle_detector import VehicleDetector
 from src.detectors.plate_detector import PlateDetector
-from src.selector.best_frame_selector import BestFrameSelector
+from src.selector.best_frame_selector import OnlineBestFrameSelector
 from src.score.score import score_quality
 from src.tracker.sort.sort import Sort
-from src.io_utils.video_loader import VideoLoader
+from src.common_utils.video_loader import VideoLoader
+from src.common_utils.config import Config
 
 
-def run_plate_detection(config):
+def run_plate_detection():
+    conf = Config().config
 
-    output_dir = config["detected_plates_dir"]
+    output_dir = conf.get("detected_plates_dir")
 
     # Init
-    loader = VideoLoader(config["video_path"])
+    loader = VideoLoader(conf.get("video_path"))
     detector_vehicle = VehicleDetector(
-        config["model_vehicle"], config["vehicle_classes"]
+        conf.get("model_vehicle"), conf.get("vehicle_classes")
     )
-    detector_plate = PlateDetector(config["model_plate"], config["plate_classes"])
+    detector_plate = PlateDetector(conf.get("model_plate"), conf.get("plate_classes"))
     tracker = Sort()
-    selector = BestFrameSelector(score_quality)
-    os.makedirs(output_dir, exist_ok=True)
+    selector = OnlineBestFrameSelector(score_quality, output_dir)
 
     frame_count = 0
     for frame in loader:
-        if frame_count % config.get("frame_skip", 1) != 0:
+        if frame_count % conf.get("frame_skip", 1) != 0:
             frame_count += 1
             continue
 
         # 1. Detect & Track Vehicles
         vehicles = detector_vehicle.detect(
-            frame, conf_threshold=config["car_detection_threshold"]
+            frame, conf_threshold=conf["car_detection_threshold"]
         )
         if not vehicles or not len(vehicles):
             continue
@@ -50,14 +49,17 @@ def run_plate_detection(config):
             x1, y1, x2, y2, track_id = map(int, trk)
             tracked_dicts.append({"id": track_id, "bbox": (x1, y1, x2, y2)})
 
+        active_ids = set()
         for vehicle in tracked_dicts:
             vid = vehicle["id"]
+            active_ids.add(vid)
+            selector.mark_seen(vid)
             x1, y1, x2, y2 = vehicle["bbox"]
             vh_crop = frame[y1:y2, x1:x2]
 
             # 2. Detect Plate inside Vehicle Crop
             plates = detector_plate.detect(
-                vh_crop, conf_threshold=config["plate_detection_threshold"]
+                vh_crop, conf_threshold=conf.get("plate_detection_threshold")
             )
             if not plates:
                 continue
@@ -74,7 +76,7 @@ def run_plate_detection(config):
                 if plate_crop.size == 0:
                     continue  # Avoid passing empty arrays to imshow
 
-                if pw * ph < int(config["crop_dimension_threshold"]):
+                if pw * ph < int(conf.get("crop_dimension_threshold", 0)):
                     continue  # skip tiny plates
 
                 # Sanity check plate aspect ratio:
@@ -87,35 +89,28 @@ def run_plate_detection(config):
 
                 score = score_quality(plate_crop)
 
-                print(
-                    f"[Vehicle {vid} | Frame {frame_count}] Plate crop size: {plate_crop.shape[:2]}, Score: {score:.2f}"
-                )
+                # print(
+                #     f"[Vehicle {vid} | Frame {frame_count}] Plate crop size: {plate_crop.shape[:2]}, Score: {score:.2f}"
+                # )
 
                 if score > best_score:
                     best_score = score
                     best_crop = plate_crop
 
             if best_crop is not None:
-                selector.update(vid, best_crop)
-                print(
-                    f"[Vehicle {vid} | Frame {frame_count}] ✅ Best score this frame: {best_score:.2f}"
-                )
+                score, improved = selector.update(vid, best_crop, frame_count)
+                # if improved:
+                #     print(
+                #         f"[Vehicle {vid} | Frame {frame_count}] ✅ improved to {best_score:.2f}"
+                #     )
 
-            # # 3. Score Sharpness
-            # if plate_crop is not None:
-            #     selector.update(vid, plate_crop)
+            # check which tracks to finalize this frame
+            to_finalize = selector.step_end(active_ids, frame_count)
+            for vid in to_finalize:
+                # TODO do it asyncronously
+                selector.finalize(vid)
 
         frame_count += 1
-
-    # 4. Save best plates
-    for vid, best_plate in selector.get_best_frames().items():
-        path = os.path.join(output_dir, f"Vehicle_{vid}_best_plate.jpg")
-        # cv2.imshow(f"Vehicle_{vid}_best_plate.jpg", best_plate)
-        # cv2.waitKey(0)  # Press any key to continue
-        # cv2.destroyAllWindows()
-        cv2.imwrite(path, best_plate)
-
-    print(f"✅ Done. Saved best plate for {len(selector.best_frames)} vehicles.")
 
 # Shrink box by a fixed margin percentage
 def shrink_box(x1, y1, x2, y2, shrink_ratio=0.5):

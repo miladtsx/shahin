@@ -1,27 +1,27 @@
 import os
 import cv2
 import numpy as np
-from typing import List, Tuple
-import uuid
+from typing import Tuple
+from src.common_utils.config import Config
 
 
 class PlatePreprocessor:
     def __init__(
         self,
-        input_dir: str,
-        output_dir: str,
         resize_dim: Tuple[int, int] = (256, 64),
         min_char_area: int = 80,
     ):
-        self.input_dir = input_dir
-        self.output_dir = output_dir
+        conf = Config().config
+
+        self.input_dir = conf.get("detected_plates_dir")
+        self.output_dir = conf.get("preprocessed_plates_dir")
         self.resize_dim = resize_dim
         self.min_char_area = min_char_area
         self.templates = self._load_templates(
             "/run/media/dev/SSD/labs/ai/shahin/res/data/training_data/digits/"
         )
 
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
 
     def _load_templates(self, dir_path: str) -> dict:
         templates = {}
@@ -30,7 +30,7 @@ class PlatePreprocessor:
                 continue
             label = os.path.splitext(fname)[0]
             img = cv2.imread(os.path.join(dir_path, fname), cv2.IMREAD_GRAYSCALE)
-            img = cv2.resize(img, (32, 32)) # type: ignore
+            img = cv2.resize(img, (32, 32))  # type: ignore
             _, img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
             templates[label] = img
         return templates
@@ -49,7 +49,7 @@ class PlatePreprocessor:
                 best_score = score
                 best_label = label
 
-        return best_label # type: ignore
+        return best_label  # type: ignore
 
     def _save_debug(self, image, filename, tag):
         os.makedirs(f"debug/preprocess/{filename}", exist_ok=True)
@@ -74,7 +74,22 @@ class PlatePreprocessor:
 
         return morphed
 
-    def preprocess(self):
+    def preprocess(self, file_name):
+        if not file_name.lower().endswith((".png", ".jpg", ".jpeg")):
+            return
+
+        path = os.path.join(self.input_dir, file_name)
+        image = cv2.imread(path)
+        if image is None:
+            print(f"[WARN] Failed to read {file_name}")
+            return
+
+        resized = cv2.resize(image, self.resize_dim)
+        result = self._preprocess(resized, file_name)
+
+        cv2.imwrite(os.path.join(self.output_dir, file_name), result)
+
+    def preprocess_bulk(self):
         for filename in os.listdir(self.input_dir):
             if not filename.lower().endswith((".png", ".jpg", ".jpeg")):
                 continue
