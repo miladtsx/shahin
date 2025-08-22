@@ -7,6 +7,8 @@ from src.tracker.sort.sort import Sort
 from src.common_utils.video_loader import VideoLoader
 from src.common_utils.config import Config
 
+from concurrent.futures import ThreadPoolExecutor
+
 
 def run_plate_detection():
     conf = Config().config
@@ -58,9 +60,13 @@ def run_plate_detection():
             vh_crop = frame[y1:y2, x1:x2]
 
             # 2. Detect Plate inside Vehicle Crop
-            plates = detector_plate.detect(
-                vh_crop, conf_threshold=conf.get("plate_detection_threshold")
-            )
+            plates = []
+            try:
+                plates = detector_plate.detect(
+                    vh_crop, conf_threshold=conf.get("plate_detection_threshold")
+                )
+            except Exception as e:
+                print(f"Error detecting plates: {e}")
             if not plates:
                 continue
 
@@ -107,8 +113,8 @@ def run_plate_detection():
             # check which tracks to finalize this frame
             to_finalize = selector.step_end(active_ids, frame_count)
             for vid in to_finalize:
-                # TODO do it asyncronously
-                selector.finalize(vid)
+                with ThreadPoolExecutor() as executer:
+                    executer.submit(selector.finalize, vid)
 
         frame_count += 1
 

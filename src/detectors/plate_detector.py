@@ -3,7 +3,7 @@ import cv2
 
 class PlateDetector:
     def __init__(self, model_path, allowed_classes):
-        self.model = YOLO(model_path)
+        self.model = YOLO(model_path, task="obb")
         self.allowed = set(allowed_classes)
         self.class_names = self.model.names
 

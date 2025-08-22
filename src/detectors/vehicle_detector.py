@@ -3,7 +3,7 @@ import cv2
 
 class VehicleDetector:
     def __init__(self, model_path, allowed_classes):
-        self.model = YOLO(model_path)
+        self.model = YOLO(model_path, task="detect", verbose=False)
         self.allowed = set(allowed_classes)
         self.class_names = self.model.names
 
