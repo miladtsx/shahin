@@ -119,7 +119,8 @@ class PlateSegmention:
         glyphs = []
         for idx, (x, y, w, h) in enumerate(boxes):
             crop = thresh[y : y + h, x : x + w]
-            glyph = self._resize_and_pad(crop, (32, 32))
+            # Invert before saving the glyph
+            glyph = 255 - self._resize_and_pad(crop, (32, 32))
             glyphs.append(glyph)
             self._save_debug(glyph, filename, f"glyph_{idx}")
 
