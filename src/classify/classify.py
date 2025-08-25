@@ -1,18 +1,40 @@
 from ultralytics import YOLO
-import os
 
-# Load the trained model
-model = YOLO("./runs/classify/train2/weights/last.pt")
 
-# Predict a single image
-input_dir = "/run/media/dev/SSD/labs/ai/shahin/out/segmentation/Vehicle_1_plate"
-input_files = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+class GlyphClassifier:
+    def __init__(
+        self,
+    ):
+        self.digit_classifier_model = YOLO(
+            "./res/models/digit_classifier.pt", verbose=False
+        )
 
-for input_file in input_files:
-    results = model.predict(input_file, device="cpu")
-    pred = results[0]
-    probs = pred.probs.data.cpu().numpy()
-    class_id = probs.argmax()
-    confidence = probs[class_id]
-    class_name = pred.names[class_id]
-    print(f"File: {os.path.basename(input_file)}, Predicted class: {class_name}, confidence: {confidence:.3f}")
+    def classify_digit(self, input_img):
+        results = self.digit_classifier_model.predict(
+            input_img, device="cpu", imgsz=32, verbose=False
+        )
+        pred = results[0]
+        probs = pred.probs.data.cpu().numpy()
+        class_id = probs.argmax()
+        confidence = probs[class_id]
+        class_name = pred.names[int(class_id)]
+        return {
+            "class_id": str(class_id),
+            "class_name": class_name,
+            "confidence": float(confidence),
+        }
+
+    def classify_alphabet(self, input_img):
+        results = self.digit_classifier_model.predict(
+            input_img, device="cpu", imgsz=32, verbose=False
+        )
+        pred = results[0]
+        probs = pred.probs.data.cpu().numpy()
+        class_id = probs.argmax()
+        confidence = probs[class_id]
+        class_name = pred.names[int(class_id)]
+        return {
+            "class_id": str(class_id),
+            "class_name": class_name,
+            "confidence": float(confidence),
+        }
