@@ -1,9 +1,11 @@
 from collections import defaultdict
 import os
 import cv2
+from src.classify.classify import GlyphClassifier
 from src.segmentation.segmentation import PlateSegmention
-from src.common_utils.config import Config
 from src.preprocessor.preprocessor import PlatePreprocessor
+from concurrent.futures import ThreadPoolExecutor
+from src.db.sqlite import DB
 
 
 class OnlineBestFrameSelector:
@@ -63,7 +65,7 @@ class OnlineBestFrameSelector:
         return finalized
 
     def finalize(self, vid):
-        """Save best frame to disk and cleanup."""
+        """Select the best frame (Save to disk for debugging)."""
         file_name = f"Vehicle_{vid}_plate.jpg"
         file_path = os.path.join(self.output_dir, file_name)
         if vid in self.best_frames:
@@ -71,15 +73,53 @@ class OnlineBestFrameSelector:
             # print(f"[Vehicle {vid}] ✅ Finalized and saved best plate")
         else:
             print(f"[Vehicle {vid}] ⚠️ No plate detected, operator input needed")
+
+        # Cleanup
         self.best_frames.pop(vid, None)
         self.best_scores.pop(vid, None)
         self.last_update.pop(vid, None)
         self.missed_frames.pop(vid, None)
 
+        # downstream processing: use full path for processors
         preprocessor = PlatePreprocessor()
         preprocessor.preprocess(file_name)
 
         segmentation = PlateSegmention()
-        segmentation.segment(file_name)
+        glyphs = segmentation.segment(file_name)
 
+        # Classify
+        if glyphs is None:
+            return
 
+        classifier = GlyphClassifier()
+
+        final_plate_text = [""] * 8
+
+        def classify_glyph(idx_g):
+            idx, g = idx_g
+            # item index 2 is non-digit.
+            if idx == 2:
+                class_id = classifier.classify_alphabet(g).get("class_id")
+            else:
+                class_id = classifier.classify_digit(g).get("class_id")
+            return idx, str(class_id) if class_id is not None else ""
+
+        with ThreadPoolExecutor() as executor:
+            results = executor.map(classify_glyph, glyphs)
+
+        for idx, class_id in results:
+            final_plate_text[idx] = class_id
+
+        # persist result to sqlite DB in the output directory
+        plate_text = "".join(final_plate_text)
+
+        db = DB()
+        try:
+            db.insert_plate(vid, file_path, plate_text)
+        except Exception as e:
+            #TODO log error
+            print(f"[Vehicle {vid}] [Plate {plate_text}] ⚠️ Failed to write to DB: {e}")
+        finally:
+            db.stop()
+
+        return final_plate_text
