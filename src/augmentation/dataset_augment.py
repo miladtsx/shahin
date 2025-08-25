@@ -1,19 +1,20 @@
 import os, cv2, random, numpy as np
 import albumentations as A
-from glob import glob
 
 # ---------- CONFIG ----------
-DATASET_DIR = "./res/data/dataset"
-OUTPUT_DIR = "./res/data/augmented_dataset"
-TARGET_PER_CLASS = 1000
-IMG_SIZE = 128
+DATASET_DIR = "./res/data/dataset/digits"
+OUTPUT_DIR = "./res/data/train"
+TARGET_PER_CLASS = 10000
+IMG_SIZE = 32
 SEED = 42
+MAX_ERASE_FRACTION = 0.50
+NOISE_RATIO = 0.5
+COMBO_RATIO = 0.25
+ROTATE_RATIO = 0.25
 # ----------------------------
 
 random.seed(SEED)
 np.random.seed(SEED)
-
-# ----------- UTILITIES -----------
 
 
 def ensure_dir(p):
@@ -22,207 +23,148 @@ def ensure_dir(p):
 
 def list_images(d):
     exts = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp")
-    return [p for p in glob(os.path.join(d, "*")) if p.lower().endswith(exts)]
+    return [os.path.join(d, f) for f in os.listdir(d) if f.lower().endswith(exts)]
 
 
-def load_gray(path):
+def load_gray_resize(path):
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if img is None:
-        raise RuntimeError(f"Failed to read image: {path}")
-    return img
+        raise RuntimeError(f"Failed to read {path}")
+    return cv2.resize(img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
 
 
-# ----------- CUSTOM AUGMENTATION OPS -----------
+# --- Augmentations ---
+
+GAUSS_NOISE = A.GaussNoise(std_range=(0.1, 0.50), p=1.0)
 
 
-def erase_natural_shapes_rgb(img, max_erase_fraction=0.6, n_shapes=(1,5)):
-    """
-    Works on RGB images. White-fill occlusions.
-    Total erased pixels limited to max_erase_fraction of image.
-    """
-    h, w = img.shape[:2]
-    out = img.copy()
-    erased_pixels = 0
-    max_pixels = int(h * w * max_erase_fraction)
+def adjust_brightness_contrast_u8(img, brightness_limit=0.1, contrast_limit=0.1):
+    alpha = 1.0 + np.random.uniform(-contrast_limit, contrast_limit)
+    beta = np.random.uniform(-brightness_limit, brightness_limit) * 255.0
+    return cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
 
+
+def add_noise(img):
+    out = GAUSS_NOISE(image=img)["image"]
+    if random.random() < 0.5:
+        out = adjust_brightness_contrast_u8(out, 0.1, 0.1)
+    return out
+
+
+def erase_small_shapes(img, max_erase_fraction=MAX_ERASE_FRACTION, n_shapes=(1, 3)):
+    h, w = img.shape
+    limit = int(h * w * max_erase_fraction)
+    mask = np.zeros((h, w), dtype=bool)
     for _ in range(random.randint(*n_shapes)):
-        shape_type = random.choice(['rect', 'circle', 'triangle', 'ellipse', 'polygon'])
-        temp = out.copy()
-
-        white = (255, 255, 255)
-
-        if shape_type == 'rect':
-            rh = random.randint(2, int(h*0.25))
-            rw = random.randint(2, int(w*0.25))
-            x1 = random.randint(0, w - rw)
-            y1 = random.randint(0, h - rh)
-            temp[y1:y1+rh, x1:x1+rw] = white
-
-        elif shape_type == 'circle':
-            radius = random.randint(2, int(min(h,w)*0.25))
-            center = (random.randint(0, w-1), random.randint(0, h-1))
-            cv2.circle(temp, center, radius, white, -1)
-
-        elif shape_type == 'triangle':
-            pts = np.array([[random.randint(0,w-1), random.randint(0,h-1)] for _ in range(3)], np.int32)
-            cv2.fillPoly(temp, [pts], white)
-
-        elif shape_type == 'ellipse':
-            center = (random.randint(0, w-1), random.randint(0, h-1))
-            axes = (random.randint(2,int(w*0.25)), random.randint(2,int(h*0.25)))
-            angle = random.uniform(0, 360)
-            cv2.ellipse(temp, center, axes, angle, 0, 360, white, -1)
-
-        elif shape_type == 'polygon':
-            n_pts = random.randint(3,6)
-            pts = np.array([[random.randint(0,w-1), random.randint(0,h-1)] for _ in range(n_pts)], np.int32)
-            cv2.fillPoly(temp, [pts], white)
-
-        # count newly erased pixels (all channels must be 255)
-        mask_old = np.all(out==255, axis=2)
-        mask_new = np.all(temp==255, axis=2)
-        new_erased = np.sum(mask_new & ~mask_old)
-
-        if erased_pixels + new_erased <= max_pixels:
-            out = temp
-            erased_pixels += new_erased
+        tmp = np.zeros_like(mask)
+        shape = random.choice(["rect", "circle", "ellipse"])
+        if shape == "rect":
+            rh, rw = random.randint(1, int(h * 0.15)), random.randint(1, int(w * 0.15))
+            x1, y1 = random.randint(0, w - rw), random.randint(0, h - rh)
+            tmp[y1 : y1 + rh, x1 : x1 + rw] = True
+        elif shape == "circle":
+            r = random.randint(1, int(min(h, w) * 0.15))
+            cx, cy = random.randint(r, w - r), random.randint(r, h - r)
+            yy, xx = np.ogrid[:h, :w]
+            tmp = ((xx - cx) ** 2 + (yy - cy) ** 2) <= r * r
+        else:
+            ax, ay = random.randint(1, int(w * 0.15)), random.randint(1, int(h * 0.15))
+            cx, cy = random.randint(0, w - 1), random.randint(0, h - 1)
+            ang = np.deg2rad(random.uniform(0, 360))
+            yy, xx = np.ogrid[:h, :w]
+            xr, yr = xx - cx, yy - cy
+            ca, sa = np.cos(ang), np.sin(ang)
+            xra, yra = xr * ca + yr * sa, -xr * sa + yr * ca
+            tmp = (xra * xra) / (ax * ax) + (yra * yra) / (ay * ay) <= 1.0
+        new_area = np.count_nonzero(tmp & ~mask)
+        if np.count_nonzero(mask) + new_area <= limit:
+            mask |= tmp
         else:
             break
-
-    return out
-
-def random_erode(img, ksize=(1,3), iters=(1,2)):
-    """Erode each channel independently to simulate fading strokes."""
     out = img.copy()
-    for c in range(3):
-        k = random.randint(*ksize)
-        i = random.randint(*iters)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (k, k))
-        out[:,:,c] = cv2.erode(out[:,:,c], kernel, iterations=i)
+    out[mask] = 255
     return out
 
-def apply_scratches_pipeline(img):
-    out = erase_natural_shapes_rgb(img)
-    if random.random() < 0.6:
-        out = random_erode(out)
-    return out
 
-# ----------- ALBUMENTATIONS PIPELINES -----------
-
-base_resize = [] if IMG_SIZE is None else [A.Resize(IMG_SIZE, IMG_SIZE)]
-
-noise_pipeline = A.Compose(
-    [
-        *base_resize,
-        A.GaussNoise(std_range=(0.1, 0.5), p=1.0),
-        A.RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.15, p=0.4),
-    ]
-)
-
-angle_pipeline = A.Compose(
-    [
-        *base_resize,
-        A.Affine(
-            rotate=(-5, 5),
-            translate_percent=(0.02, 0.05),
-            scale=(0.9, 1.1),
-            shear=(-5, 5),
-            p=0.7,
-        ),
-        A.Perspective(scale=(0.02, 0.06), keep_size=True, fit_output=False, p=0.5),
-    ]
-)
+def rotate_image(img):
+    angle = random.uniform(-1, 1)
+    h, w = img.shape
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
+    return cv2.warpAffine(
+        img,
+        M,
+        (w, h),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=255,
+    )
 
 
-def scratches_transform(image, **kwargs):
-    return apply_scratches_pipeline(image)
-
-scratch_pipeline = A.Compose(
-    [
-        *base_resize,
-        A.Affine(scale=(0.9, 1.1), translate_percent=(0.02, 0.05),
-                 rotate=(-10, 10), shear=(-5, 5), p=1.0),
-        A.Lambda(image=scratches_transform),
-    ]
-)
-# ----------- MAIN AUGMENTATION -----------
-
-
-def augment_once(img, kind):
-    if kind == "noise":
-        return noise_pipeline(image=img)["image"]
-    if kind == "angle":
-        return angle_pipeline(image=img)["image"]
-    if kind == "scratch":
-        # apply scratch on grayscale, then convert to RGB
-        aug = scratch_pipeline(image=cv2.cvtColor(img, cv2.COLOR_GRAY2RGB))["image"]
-        return aug
-    raise ValueError(kind)
-
-
-def per_class_counts(target):
-    n_noise = int(round(0.10 * target))
-    n_angle = int(round(0.10 * target))
-    n_scratch = target - n_noise - n_angle
-    return n_noise, n_angle, n_scratch
-
-def to_binary(img, threshold=128):
-    """Convert grayscale or RGB image to binary (0 or 255)."""
-    if len(img.shape) == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    _, binary = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY)
-    return binary
-
-
-def process_class(cls, src_imgs):
-    out_dir = os.path.join(OUTPUT_DIR, cls)
-    ensure_dir(out_dir)
-    existing = 0
-
-    # Copy originals
-    for p in src_imgs:
-        img = load_gray(p)
-        if IMG_SIZE is not None:
-            img = cv2.resize(img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
-        cv2.imwrite(os.path.join(out_dir, os.path.basename(p)), img)
-        existing += 1
-
-    to_make = max(0, TARGET_PER_CLASS - existing)
-    n_noise, n_angle, n_scratch = per_class_counts(to_make)
-    base_cycle = 0
-
-    def pick_base():
-        nonlocal base_cycle
-        p = src_imgs[base_cycle % len(src_imgs)]
-        base_cycle += 1
-        return load_gray(p)
-
+# --- Main Augmentation ---
+def augment_and_save(base_imgs, cls_dir, to_make):
+    n_combo = int(to_make * COMBO_RATIO)
+    n_rotate = int(to_make * ROTATE_RATIO)
+    remaining = to_make - n_combo - n_rotate
+    n_noise = int(remaining * NOISE_RATIO)
+    n_erase = remaining - n_noise
+    total_base = len(base_imgs)
     idx = 0
-    for kind, n_aug in [("noise", n_noise), ("angle", n_angle), ("scratch", n_scratch)]:
-        for _ in range(n_aug):
-            img = pick_base()
-            aug = augment_once(img, kind)
-            binary_aug = to_binary(aug)
-            cv2.imwrite(os.path.join(out_dir, f"{cls}_{kind}_{idx:04d}.png"), binary_aug)
-            idx += 1
 
-    total = len(list_images(out_dir))
-    print(f"[DONE] {cls}: {total} images")
+    aug_specs = [
+        ("noise", n_noise),
+        ("erase", n_erase),
+        ("combo", n_combo),
+        ("rotate", n_rotate),
+    ]
+
+    png_params = [cv2.IMWRITE_PNG_COMPRESSION, 3]
+
+    for kind, n_aug in aug_specs:
+        for i in range(n_aug):
+            img = base_imgs[(idx + i) % total_base]
+            if kind == "noise":
+                aug = add_noise(img)
+            elif kind == "erase":
+                aug = erase_small_shapes(img)
+            elif kind == "combo":
+                aug = erase_small_shapes(img)
+                aug = add_noise(aug)
+            elif kind == "rotate":
+                aug = rotate_image(img)
+            else:
+                aug = img
+            cv2.imwrite(
+                os.path.join(cls_dir, f"{kind}_{idx+i:05d}.png"), aug, png_params
+            )
+        idx += n_aug
+
+
+def process_class(cls):
+    src_imgs = list_images(os.path.join(DATASET_DIR, cls))
+    if not src_imgs:
+        print(f"[SKIP] {cls}: no images")
+        return
+
+    cls_dir = os.path.join(OUTPUT_DIR, cls)
+    ensure_dir(cls_dir)
+    base_imgs = [load_gray_resize(p) for p in src_imgs]
+
+    for p, img in zip(src_imgs, base_imgs):
+        cv2.imwrite(os.path.join(cls_dir, os.path.basename(p)), img)
+
+    existing = len(base_imgs)
+    to_make = max(0, TARGET_PER_CLASS - existing)
+    if to_make > 0:
+        augment_and_save(base_imgs, cls_dir, to_make)
+
+    print(f"[DONE] {cls}: {existing + to_make} images")
 
 
 def main():
     ensure_dir(OUTPUT_DIR)
-    class_dirs = [
-        d
-        for d in sorted(os.listdir(DATASET_DIR))
-        if os.path.isdir(os.path.join(DATASET_DIR, d))
-    ]
-    for cls in class_dirs:
-        src_imgs = list_images(os.path.join(DATASET_DIR, cls))
-        if not src_imgs:
-            print(f"[SKIP] {cls}: no images")
-            continue
-        process_class(cls, src_imgs)
+    for cls in sorted(os.listdir(DATASET_DIR)):
+        if os.path.isdir(os.path.join(DATASET_DIR, cls)):
+            process_class(cls)
 
 
 if __name__ == "__main__":
