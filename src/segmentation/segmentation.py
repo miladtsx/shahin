@@ -142,13 +142,15 @@ class PlateSegmention:
         image_path = os.path.join(self.input_dir, file_name)
         glyphs = self._segment_glyphs(image_path)
 
+        results = []
+        dir_path = os.path.join(self.output_dir, f"{os.path.splitext(file_name)[0]}")
+        os.makedirs(dir_path, exist_ok=True)
         for idx, glyph in enumerate(glyphs):
-            dir_path = os.path.join(
-                self.output_dir, f"{os.path.splitext(file_name)[0]}"
-            )
-            os.makedirs(dir_path, exist_ok=True)
             output_path = os.path.join(dir_path, f"_glyph_{idx}.png")
             cv2.imwrite(output_path, glyph)
+            results.append((idx, glyph))
+
+        return results
 
     def segment_bulk(self):
         """Segment all images in the output directory."""
