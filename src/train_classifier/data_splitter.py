@@ -1,6 +1,6 @@
 import os, shutil, random
 
-DATA_DIR = "./res/data/train"
+DATA_DIR = "./res/data/train/"
 OUTPUT_DIR = "./res/data/train_split"
 VAL_RATIO = 0.2
 random.seed(42)
