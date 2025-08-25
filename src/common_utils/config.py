@@ -4,6 +4,7 @@ from typing import TypedDict
 
 class MyConfig(TypedDict):
     detected_plates_dir: str
+    db_path: str
     video_path: str
     preprocessed_plates_dir: str
     segmentation_output_dir: str
