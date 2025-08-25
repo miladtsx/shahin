@@ -8,7 +8,7 @@ class VehicleDetector:
         self.class_names = self.model.names
 
     def detect(self, frame, conf_threshold=0.5):
-        results = self.model(frame)[0]
+        results = self.model(frame, verbose=False)[0]
         detections_ = []
         for detection in results.boxes.data.tolist():
             x1, y1, x2, y2, score, class_id = detection
@@ -18,7 +18,7 @@ class VehicleDetector:
 
     def draw(self, frame, tracked_boxes):
         for det in tracked_boxes:
-            car_id = det.get('id', '-1')
+            car_id = det.get("id", "-1")
             x1, y1, x2, y2 = det["bbox"]
             label = f"ID:{car_id} {det['cls']} {det['conf']:.2f}"
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)

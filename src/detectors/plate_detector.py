@@ -3,14 +3,14 @@ import cv2
 
 class PlateDetector:
     def __init__(self, model_path, allowed_classes):
-        self.model = YOLO(model_path, task="obb")
+        self.model = YOLO(model_path, task="obb", verbose=False)
         self.allowed = set(allowed_classes)
         self.class_names = self.model.names
 
     def detect(self, frame, conf_threshold=0.8):
         if frame.size == 0:
             return []
-        results = self.model(frame)[0]
+        results = self.model(frame, verbose=False)[0]
         output = []
         for box in results.boxes:
             cls_id = int(box.cls)
