@@ -17,39 +17,7 @@ class PlatePreprocessor:
         self.output_dir = conf.get("preprocessed_plates_dir")
         self.resize_dim = resize_dim
         self.min_char_area = min_char_area
-        self.templates = self._load_templates(
-            "/run/media/dev/SSD/labs/ai/shahin/res/data/training_data/digits/"
-        )
-
         os.makedirs(self.output_dir, exist_ok=True)
-
-    def _load_templates(self, dir_path: str) -> dict:
-        templates = {}
-        for fname in os.listdir(dir_path):
-            if not fname.endswith(".jpg"):
-                continue
-            label = os.path.splitext(fname)[0]
-            img = cv2.imread(os.path.join(dir_path, fname), cv2.IMREAD_GRAYSCALE)
-            img = cv2.resize(img, (32, 32))  # type: ignore
-            _, img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
-            templates[label] = img
-        return templates
-
-    # TODO check this out
-    def recognize(self, glyph: np.ndarray) -> str:
-        glyph = cv2.resize(glyph, (32, 32))
-        _, glyph = cv2.threshold(glyph, 127, 255, cv2.THRESH_BINARY)
-
-        best_label = None
-        best_score = float("inf")
-
-        for label, template in self.templates.items():
-            score = np.sum(glyph != template)  # Hamming distance
-            if score < best_score:
-                best_score = score
-                best_label = label
-
-        return best_label  # type: ignore
 
     def _save_debug(self, image, filename, tag):
         os.makedirs(f"debug/preprocess/{filename}", exist_ok=True)
