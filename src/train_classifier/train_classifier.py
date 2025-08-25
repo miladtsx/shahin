@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
 # Create a new YOLO model (use yolov8n backbone for speed)
-model = YOLO("./res/models/yolov8n-cls.pt", verbose=False)  # pretrained classifier model
+model = YOLO("./res/models/base_classifier_yolov8n-cls.pt", verbose=False)  # pretrained classifier model
 
 # Train
 model.train(

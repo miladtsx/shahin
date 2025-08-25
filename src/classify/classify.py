@@ -6,7 +6,7 @@ class GlyphClassifier:
         self,
     ):
         self.digit_classifier_model = YOLO(
-            "./res/models/digit_classifier.pt", verbose=False
+            "./res/models/digit_classifier_yolov8n.pt", verbose=False
         )
 
     def classify_digit(self, input_img):
