@@ -4,6 +4,9 @@ import queue
 from datetime import datetime
 import os
 from src.common_utils.config import Config
+from src.common_utils.app_logger import get_logger, log_duration
+
+logger = get_logger("db", logfile="logs/app.jsonl")
 
 
 class DB:
@@ -15,7 +18,8 @@ class DB:
         self._stop_event = threading.Event()
         self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
         self._writer_thread.start()
-        self.initialize_db()
+        with log_duration(logger, "initialize_db"):
+            self.initialize_db()
 
     def initialize_db(self):
         with sqlite3.connect(self.db_path) as conn:
@@ -32,6 +36,7 @@ class DB:
                 """
             )
             conn.commit()
+        logger.info("initialize_db_success", extra={"db_path": self.db_path})
 
     def _writer_loop(self):
         conn = sqlite3.connect(self.db_path)
@@ -47,7 +52,7 @@ class DB:
                 cur.execute(*task)
                 conn.commit()
             except Exception as e:
-                print(f"[DB ERROR] {e}")
+                logger.exception("db_writer_error", extra={"error": str(e)})
             finally:
                 self._task_queue.task_done()
         conn.close()
@@ -57,6 +62,8 @@ class DB:
         self._stop_event.set()
         self._task_queue.put(None)
         self._writer_thread.join()
+
+    logger.info("db_stopped")
 
     def insert_plate(self, vid: int, file_path: str, plate_text: str):
         # Validate input
@@ -75,4 +82,7 @@ class DB:
                 "INSERT INTO plates (vehicle_id, image_path, plate_text) VALUES (?, ?, ?)",
                 (str(vid), file_path, plate_text),
             )
+        )
+        logger.info(
+            "insert_plate_enqueued", extra={"vehicle_id": vid, "path": file_path}
         )

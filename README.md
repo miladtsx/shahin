@@ -18,7 +18,7 @@ Select the sharpest, best-quality frame of each unique license plate from a 120 
 
 ## Setup
 
-```bash
+```sh
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -40,5 +40,19 @@ Then run:
 ```sh
 $ ./main.py
 ```
+# Logging
+## Quickstart: Loki + Promtail + Grafana (Docker Compose)
+
+Start a local stack that collects `logs/app.jsonl` and provides a Grafana UI:
+
+```bash
+docker-compose up -d
+```
+
+After the stack starts:
+- Grafana: http://localhost:3000 (user: admin / password: admin)
+
+Promtail is configured to read `./logs/*.jsonl` and push to Loki. Use the provided `docker/promtail-config.yaml` if you need to tweak parsing or labels.
+
 ## Document
 [link](https://docs.google.com/document/d/1_Q-legmeUw9Q5sP0G9K7ayoIYyhgSnebhKUnHNxscoQ/edit?tab=t.0#heading=h.z6ne0og04bp5)

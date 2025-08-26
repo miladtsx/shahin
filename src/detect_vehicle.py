@@ -6,23 +6,31 @@ from src.score.score import score_quality
 from src.tracker.sort.sort import Sort
 from src.common_utils.video_loader import VideoLoader
 from src.common_utils.config import Config
-
+from src.common_utils.app_logger import get_logger, log_duration
 from concurrent.futures import ThreadPoolExecutor
+
+logger = get_logger("detect", logfile="logs/app.jsonl")
 
 
 def run_plate_detection():
     conf = Config().config
 
     output_dir = conf.get("detected_plates_dir")
+    logger.info(
+        "run_plate_detection_start", extra={"event": "run_plate_detection_start"}
+    )
 
     # Init
-    loader = VideoLoader(conf.get("video_path"))
-    detector_vehicle = VehicleDetector(
-        conf.get("model_vehicle"), conf.get("vehicle_classes")
-    )
-    detector_plate = PlateDetector(conf.get("model_plate"), conf.get("plate_classes"))
-    tracker = Sort()
-    selector = OnlineBestFrameSelector(score_quality, output_dir)
+    with log_duration(logger, "init_components"):
+        loader = VideoLoader(conf.get("video_path"))
+        detector_vehicle = VehicleDetector(
+            conf.get("model_vehicle"), conf.get("vehicle_classes")
+        )
+        detector_plate = PlateDetector(
+            conf.get("model_plate"), conf.get("plate_classes")
+        )
+        tracker = Sort()
+        selector = OnlineBestFrameSelector(score_quality, output_dir)
 
     frame_count = 0
     for frame in loader:
@@ -31,9 +39,10 @@ def run_plate_detection():
             continue
 
         # 1. Detect & Track Vehicles
-        vehicles = detector_vehicle.detect(
-            frame, conf_threshold=conf["car_detection_threshold"]
-        )
+        with log_duration(logger, "detect_vehicles", frame=frame_count):
+            vehicles = detector_vehicle.detect(
+                frame, conf_threshold=conf["car_detection_threshold"]
+            )
         if not vehicles or not len(vehicles):
             continue
 
@@ -66,7 +75,10 @@ def run_plate_detection():
                     vh_crop, conf_threshold=conf.get("plate_detection_threshold")
                 )
             except Exception as e:
-                print(f"Error detecting plates: {e}")
+                logger.exception(
+                    "plate_detection_error",
+                    extra={"vehicle_id": vid, "frame": frame_count},
+                )
             if not plates:
                 continue
 
@@ -95,9 +107,15 @@ def run_plate_detection():
 
                 score = score_quality(plate_crop)
 
-                # print(
-                #     f"[Vehicle {vid} | Frame {frame_count}] Plate crop size: {plate_crop.shape[:2]}, Score: {score:.2f}"
-                # )
+                logger.info(
+                    "plate_detected",
+                    extra={
+                        "vid": vid,
+                        "frame": frame_count,
+                        "plate_crop_size": plate_crop.shape[:2],
+                        "score": score,
+                    },
+                )
 
                 if score > best_score:
                     best_score = score
@@ -105,10 +123,15 @@ def run_plate_detection():
 
             if best_crop is not None:
                 score, improved = selector.update(vid, best_crop, frame_count)
-                # if improved:
-                #     print(
-                #         f"[Vehicle {vid} | Frame {frame_count}] ✅ improved to {best_score:.2f}"
-                #     )
+                if improved:
+                    logger.info(
+                        "plate_improved",
+                        extra={
+                            "vid": vid,
+                            "frame": frame_count,
+                            "score": best_score,
+                        },
+                    )
 
             # check which tracks to finalize this frame
             to_finalize = selector.step_end(active_ids, frame_count)
@@ -116,7 +139,13 @@ def run_plate_detection():
                 with ThreadPoolExecutor() as executer:
                     executer.submit(selector.finalize, vid)
 
-        frame_count += 1
+            frame_count += 1
+
+        logger.info(
+            "run_plate_detection_finished",
+            extra={"event": "run_plate_detection_finished"},
+        )
+
 
 # Shrink box by a fixed margin percentage
 def shrink_box(x1, y1, x2, y2, shrink_ratio=0.5):
