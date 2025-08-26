@@ -13,45 +13,14 @@
   <body>
     <div class="container">
       <div class="header">
-        <img
-          src="{{ url_for('static', filename='logo.jpg') }}"
-          alt="Logo"
-        />
+        <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" />
         <h1>شاهین &mdash; سامانه رهگیری پلاک خودرو</h1>
       </div>
 
       <div class="card">
-        <h2>افزودن پلاک</h2>
-        <button class="new_plate" onclick="openAddPlateModal()">+</button>
-      </div>
-
-      <div id="addPlateModal" class="modal">
-        <div class="modal_content">
-          <h3>ثبت پلاک جدید</h3>
-          <input id="modal_plate_text" placeholder="شماره پلاک را وارد کنید" />
-          <div style="margin-top: 10px; text-align: center">
-            <div style="margin-top: 10px; display: flex; gap: 10px">
-              <button id="submitBtn" onclick="submitAddPlate()" style="flex: 1">
-                ثبت
-              </button>
-              <button
-                onclick="closeAddPlateModal()"
-                style="flex: 1; background: #dc3545"
-              >
-                لغو
-              </button>
-            </div>
-          </div>
-          <span
-            onclick="closeAddPlateModal()"
-            class="modal_close"
-            >&times;</span
-          >
+        <div class="card_header">
+          <button class="new_plate" onclick="openAddPlateModal()">+</button>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>پلاک‌ها</h2>
 
         <table>
           <thead>
@@ -75,34 +44,37 @@
       <img id="modalImg" class="modal_content" />
     </div>
 
+    <!-- Add New Plate Modal -->
+    <div id="addPlateModal" class="modal">
+      <div class="modal_content">
+        <h3>ثبت پلاک جدید</h3>
+        <input style="margin-right: 35px; margin-top: 35px;" id="modal_plate_text" placeholder="شماره پلاک را وارد کنید" />
+        <div style="margin-top: 50px; text-align: center">
+          <div style="margin-top: 50px; display: flex; gap: 200px">
+            <button id="submitBtn" onclick="submitAddPlate()" style="flex: 1">
+              ثبت
+            </button>
+            <button
+              onclick="closeAddPlateModal()"
+              style="flex: 1; background: #dc3545"
+            >
+              لغو
+            </button>
+          </div>
+        </div>
+        <span onclick="closeAddPlateModal()" class="modal_close">&times;</span>
+      </div>
+    </div>
+
     <!-- Image Details Modal -->
     <div id="imgDetailsModal" class="modal">
-      <div
-        class="modal_content"
-        style="width: 90%; max-width: 800px; position: relative"
-      >
-        <!-- Close button -->
-        <span
-          onclick="closePlateImageModal()"
-          style="
-            position: absolute;
-            top: 2px;
-            right: 10px;
-            cursor: pointer;
-            font-size: 42px;
-          "
+      <div class="modal-content">
+        <span class="modal-close" onclick="closePlateImageModal()"
           >&times;</span
         >
-
-        <div style="display: flex; flex-direction: column; gap: 10px">
-          <img
-            id="modalLargeImg"
-            style="width: 100%; max-height: 400px; object-fit: contain"
-          />
-          <div
-            id="modalDetails"
-            style="background: #fff; padding: 15px; border-radius: 6px"
-          ></div>
+        <div class="modal-body">
+          <img id="modalLargeImg" />
+          <div id="modalDetails"></div>
         </div>
       </div>
     </div>

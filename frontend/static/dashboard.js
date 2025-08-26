@@ -38,7 +38,13 @@ onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(p).replace(
 
     // Timestamp cell
     const tsTd = document.createElement("td");
-    tsTd.textContent = toFarsiNumber(p.timestamp);
+    const date = new Date(p.timestamp);
+    tsTd.innerHTML = `
+      <div>${toFarsiNumber(date.toLocaleDateString())}</div>
+      <div>${toFarsiNumber(
+        date.toLocaleTimeString([], { hour12: false })
+      )}</div>
+    `;
     tr.appendChild(tsTd);
 
     // Actions cell
@@ -63,18 +69,23 @@ function openPlateImageModal(src, plateData) {
   detailsDiv.innerHTML = `
     <p>شناسه: ${toFarsiNumber(plateData.id)}</p>
     <p>نام فایل: ${plateData.vehicle_id}</p>
-    <p>پلاک: <input id="editPlateText" value="${
+    <div class="plateTextModalContainer">
+    <p>پلاک: <input id="editPlateText" class="plateTextModal"  value="${
       plateData.plate_text
-    }" style="direction:rtl;"></p>
-    <div style="margin-top:10px;">
-      <button onclick="confirmUpdatePlate(${plateData.id})">بروزرسانی</button>
-      <button onclick="confirmDeletePlate(${
+    }"</p>
+    </div>
+    <div class="modalButtons">
+      <button class="updateBtn" onclick="confirmUpdatePlate(${
+        plateData.id
+      })">بروزرسانی</button>
+      <button class="deleteBtn" onclick="confirmDeletePlate(${
         plateData.id
       })" style="background:#dc3545;">حذف</button>
     </div>
   `;
 
   document.getElementById("imgDetailsModal").style.display = "block";
+  document.getElementById("editPlateText").focus();
 }
 
 function closePlateImageModal() {
@@ -202,6 +213,7 @@ function showToast(message) {
 // Add plate modal
 function openAddPlateModal() {
   document.getElementById("addPlateModal").style.display = "block";
+  document.getElementById("modal_plate_text").focus();
 }
 
 function closeAddPlateModal() {
