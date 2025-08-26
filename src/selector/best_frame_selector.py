@@ -99,16 +99,16 @@ class OnlineBestFrameSelector:
             idx, g = idx_g
             # item index 2 is non-digit.
             if idx == 2:
-                class_id = classifier.classify_alphabet(g).get("class_id")
+                class_id = classifier.classify_alphabet(g).get("class_name")
             else:
-                class_id = classifier.classify_digit(g).get("class_id")
+                class_id = classifier.classify_digit(g).get("class_name")
             return idx, str(class_id) if class_id is not None else ""
 
         with ThreadPoolExecutor() as executor:
             results = executor.map(classify_glyph, glyphs)
 
-        for idx, class_id in results:
-            final_plate_text[idx] = class_id
+        for idx, class_name in results:
+            final_plate_text[idx] = class_name
 
         # persist result to sqlite DB in the output directory
         plate_text = "".join(final_plate_text)

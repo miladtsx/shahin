@@ -8,6 +8,9 @@ class GlyphClassifier:
         self.digit_classifier_model = YOLO(
             "./res/models/digit_classifier_yolov8n.pt", verbose=False
         )
+        self.alphabet_classifier_model = YOLO(
+            "./res/models/alphabet_classifier_yolov8n.pt", verbose=False
+        )
 
     def classify_digit(self, input_img):
         results = self.digit_classifier_model.predict(
@@ -25,7 +28,7 @@ class GlyphClassifier:
         }
 
     def classify_alphabet(self, input_img):
-        results = self.digit_classifier_model.predict(
+        results = self.alphabet_classifier_model.predict(
             input_img, device="cpu", imgsz=32, verbose=False
         )
         pred = results[0]

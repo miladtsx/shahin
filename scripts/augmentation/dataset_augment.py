@@ -2,7 +2,7 @@ import os, cv2, random, numpy as np
 import albumentations as A
 
 # ---------- CONFIG ----------
-DATASET_DIR = "./res/data/dataset/digits"
+DATASET_DIR = "./res/data/dataset/alphabets"
 OUTPUT_DIR = "./res/data/train"
 TARGET_PER_CLASS = 10000
 IMG_SIZE = 32

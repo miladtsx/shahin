@@ -5,7 +5,7 @@ import os
 model = YOLO("./runs/classify/train/weights/best.pt")
 
 # Predict a single image
-input_dir = "/run/media/dev/SSD/labs/ai/shahin/out/test/digits"
+input_dir = "/run/media/dev/SSD/labs/ai/shahin/out/test/alphabets"
 input_files = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
 
 for input_file in input_files:
