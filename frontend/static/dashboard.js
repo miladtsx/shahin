@@ -144,12 +144,16 @@ async function updatePlate(id, inputElem) {
   const updated = {
     plate_text: tr.children[3].children[0].value,
   };
-  if (!confirm(`Update record ${id}?`)) return;
-  await fetch(`/plates/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updated),
-  });
+  // if (!confirm(`Update record ${id}?`)) return;
+  showConfirm(
+    `آیا از بروزرسانی پلاک ${id} مطمئنید؟`,
+    await fetch(`/plates/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated),
+    })
+  );
+
   showToast("پلاک ویرایش شد", 5000);
 }
 
@@ -179,10 +183,11 @@ function restoreInputs() {
 // add new plate modal
 
 async function deletePlate(id) {
-  if (!confirm(`پلاک ${id} برای همیشه حذف شود؟ مطمئنید؟`)) return;
-  await fetch(`/plates/${id}`, { method: "DELETE" });
-  fetchPlates();
-  showToast("پلاک حذف شد", 5000);
+  showConfirm(`پلاک ${id} برای همیشه حذف شود؟ مطمئنید؟`, async () => {
+    await fetch(`/plates/${id}`, { method: "DELETE" });
+    fetchPlates();
+    showToast("پلاک حذف شد", 5000);
+  });
 }
 
 function showToast(message) {

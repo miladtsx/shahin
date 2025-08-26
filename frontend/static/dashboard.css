@@ -217,3 +217,10 @@ tr:hover {
   overflow-y: auto;
   max-height: 90%;
 }
+
+.new_plate {
+    font-size: 2rem;
+    width: 8%;
+    text-align: center;
+    justify-content: center;
+}

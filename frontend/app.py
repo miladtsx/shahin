@@ -69,8 +69,8 @@ def update_plate(pid):
     data = request.json
     with get_conn() as conn:
         conn.execute(
-            "UPDATE plates SET plate_text = ?, image_path = ? WHERE id = ?",
-            (data["plate_text"], data["image_path"], pid),
+            "UPDATE plates SET plate_text = ? WHERE id = ?",
+            (data["plate_text"], pid),
         )
         conn.commit()
     return jsonify({"status": "updated"})
