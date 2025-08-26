@@ -1,3 +1,10 @@
+@font-face {
+    font-family: 'Vazir';
+    src: url('/static/fonts/Vazirmatn-Regular.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+}
+
 html,
 body {
     height: 100%;
@@ -33,7 +40,6 @@ h1 {
 input,
 table,
 button {
-    direction: rtl;
     text-align: right;
 }
 
@@ -167,4 +173,39 @@ tr:hover {
 
 #addPlateModal button:hover {
     opacity: 0.85;
+}
+
+/* Plate Component */
+.plate-component {
+    display: flex;
+    justify-content: center;
+    /* horizontal centering */
+    align-items: center;
+    /* vertical centering */
+    gap: 2px;
+    border: gray 1px solid;
+    font-weight: bolder;
+}
+
+.plate-component .plate-glyph:nth-child(1) {
+    margin-right: 10px;
+}
+
+.plate-component .plate-glyph:nth-child(2) {
+    margin-right: -1px;
+}
+
+.plate-component .plate-glyph:nth-child(3) {
+    margin-right: 5px;
+}
+
+.plate-component .plate-glyph:nth-child(4),
+.plate-component .plate-glyph:nth-child(5) {
+    margin-right: -1px;
+}
+
+/* ALPHABET */
+.plate-component .plate-glyph:nth-child(6) {
+    margin-left: 10px;
+    margin-right: 10px;
 }
