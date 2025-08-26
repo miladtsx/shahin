@@ -24,3 +24,5 @@ res/db/plates.db
 debug
 runs/
 logs/app.jsonl
+frontend/build
+frontend/app.spec

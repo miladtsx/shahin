@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>شاهین</title>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@30.1.0/dist/font-face.css" rel="stylesheet" type="text/css">
+
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='dashboard.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>رهگیری خودرو</h1>
+
+      <div class="card">
+        <h2>افزودن پلاک</h2>
+        <button onclick="openAddPlateModal()">افزودن پلاک جدید</button>
+      </div>
+
+      <div id="addPlateModal" class="modal">
+        <div
+          class="modal-content"
+          style="
+            background: white;
+            padding: 20px;
+            max-width: 400px;
+            border-radius: 8px;
+            margin: 10% auto;
+            position: relative;
+          "
+        >
+          <h3>پلاک جدید</h3>
+          <input id="modal_plate_text" placeholder="شماره پلاک را وارد کنید" />
+          <div style="margin-top: 10px; text-align: center">
+            <div style="margin-top: 10px; display: flex; gap: 10px">
+              <button id="submitBtn" onclick="submitAddPlate()" style="flex: 1">
+                ثبت
+              </button>
+              <button
+                onclick="closeAddPlateModal()"
+                style="flex: 1; background: #dc3545"
+              >
+                لغو
+              </button>
+            </div>
+          </div>
+          <span
+            onclick="closeAddPlateModal()"
+            style="
+              position: absolute;
+              top: 5px;
+              right: 10px;
+              cursor: pointer;
+              font-weight: bold;
+            "
+            >&times;</span
+          >
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>پلاک‌ها</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>شناسه</th>
+              <th>تصویر</th>
+              <th>شماره</th>
+              <th>زمان ثبت</th>
+              <th>عملیات</th>
+            </tr>
+          </thead>
+          <tbody id="plates_body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <div id="imgModal" class="modal" onclick="closePlateImageModal()">
+      <img id="modalImg" class="modal-content" />
+    </div>
+
+    <script
+      src="{{ url_for('static', filename='dashboard.js') }}"
+      defer
+    ></script>
+
+  </body>
+</html>
