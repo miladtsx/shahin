@@ -43,7 +43,7 @@ def list_plates():
             {
                 "id": r[0],
                 "vehicle_id": r[1],
-                "image_path": r[2],
+                "image_path": r[2] or "./static/plate_raw.jpg",
                 "plate_text": r[3],
                 "timestamp": r[4],
             }
