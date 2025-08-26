@@ -143,12 +143,22 @@ tr:hover {
     background: rgba(0, 0, 0, 0.8);
 }
 
-.modal-content {
-    display: block;
-    max-width: 80%;
-    max-height: 80%;
-    margin: auto;
-    margin-top: 5%;
+.modal_content {
+    background: white;
+    padding: 20px;
+    max-width: 400px;
+    border-radius: 8px;
+    margin: 10% auto;
+    position: relative;
+}
+
+
+.modal_close {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    cursor: pointer;
+    font-weight: bold;
 }
 
 
@@ -210,12 +220,12 @@ tr:hover {
     margin-right: 10px;
 }
 
-#imgDetailsModal .modal-content {
-  background: #f4f4f9;
-  border-radius: 8px;
-  padding: 10px;
-  overflow-y: auto;
-  max-height: 90%;
+#imgDetailsModal .modal_content {
+    background: #f4f4f9;
+    border-radius: 8px;
+    padding: 10px;
+    overflow-y: auto;
+    max-height: 90%;
 }
 
 .new_plate {
@@ -223,4 +233,17 @@ tr:hover {
     width: 8%;
     text-align: center;
     justify-content: center;
+}
+
+/* Header Styles */
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.header img {
+    height: 128px
 }

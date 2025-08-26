@@ -233,7 +233,7 @@ async function submitAddPlate() {
   }
 }
 
-// Close modal if clicking outside modal-content
+// Close modal if clicking outside modal_content
 window.onclick = function (event) {
   const modal = document.getElementById("addPlateModal");
   if (event.target == modal) modal.style.display = "none";

@@ -12,7 +12,13 @@
   </head>
   <body>
     <div class="container">
-      <h1>رهگیری خودرو</h1>
+      <div class="header">
+        <img
+          src="{{ url_for('static', filename='logo.jpg') }}"
+          alt="Logo"
+        />
+        <h1>شاهین &mdash; سامانه رهگیری پلاک خودرو</h1>
+      </div>
 
       <div class="card">
         <h2>افزودن پلاک</h2>
@@ -20,17 +26,7 @@
       </div>
 
       <div id="addPlateModal" class="modal">
-        <div
-          class="modal-content"
-          style="
-            background: white;
-            padding: 20px;
-            max-width: 400px;
-            border-radius: 8px;
-            margin: 10% auto;
-            position: relative;
-          "
-        >
+        <div class="modal_content">
           <h3>ثبت پلاک جدید</h3>
           <input id="modal_plate_text" placeholder="شماره پلاک را وارد کنید" />
           <div style="margin-top: 10px; text-align: center">
@@ -48,13 +44,7 @@
           </div>
           <span
             onclick="closeAddPlateModal()"
-            style="
-              position: absolute;
-              top: 5px;
-              right: 10px;
-              cursor: pointer;
-              font-weight: bold;
-            "
+            class="modal_close"
             >&times;</span
           >
         </div>
@@ -82,13 +72,13 @@
     <div id="toast"></div>
 
     <div id="imgModal" class="modal" onclick="closePlateImageModal()">
-      <img id="modalImg" class="modal-content" />
+      <img id="modalImg" class="modal_content" />
     </div>
 
     <!-- Image Details Modal -->
     <div id="imgDetailsModal" class="modal">
       <div
-        class="modal-content"
+        class="modal_content"
         style="width: 90%; max-width: 800px; position: relative"
       >
         <!-- Close button -->
@@ -120,7 +110,7 @@
     <!-- Confirmation Modal -->
     <div id="confirmModal" class="modal">
       <div
-        class="modal-content"
+        class="modal_content"
         style="
           background: white;
           padding: 20px;
