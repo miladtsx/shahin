@@ -22,7 +22,13 @@ async function fetchPlates() {
 
     // Image cell
     const imgTd = document.createElement("td");
-    imgTd.innerHTML = `<img src="../../${p.image_path}" style="width:128px;height:32px;cursor:pointer;" onclick="openPlateImageModal('${p.image_path}')">`;
+    imgTd.innerHTML = `<img src="../../${
+      p.image_path
+    }" style="width:128px;height:32px;cursor:pointer;" 
+onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(p).replace(
+      /"/g,
+      "&quot;"
+    )})'>`;
     tr.appendChild(imgTd);
 
     // Plate glyphs cell
@@ -45,12 +51,74 @@ async function fetchPlates() {
   });
 }
 
-function openPlateImageModal(src) {
-  document.getElementById("modalImg").src = src;
-  document.getElementById("imgModal").style.display = "block";
+function openPlateImageModal(src, plateData) {
+  document.getElementById("modalLargeImg").src = src;
+
+  // const tr = document.createElement("tr");
+  // const plateTd = document.createElement("td");
+  // plateTd.appendChild(createPlateComponent(p.plate_text, p.id));
+  // tr.appendChild(plateTd);
+
+  const detailsDiv = document.getElementById("modalDetails");
+  detailsDiv.innerHTML = `
+    <p>شناسه: ${toFarsiNumber(plateData.id)}</p>
+    <p>نام فایل: ${plateData.vehicle_id}</p>
+    <p>پلاک: <input id="editPlateText" value="${
+      plateData.plate_text
+    }" style="direction:rtl;"></p>
+    <div style="margin-top:10px;">
+      <button onclick="confirmUpdatePlate(${plateData.id})">بروزرسانی</button>
+      <button onclick="confirmDeletePlate(${
+        plateData.id
+      })" style="background:#dc3545;">حذف</button>
+    </div>
+  `;
+
+  document.getElementById("imgDetailsModal").style.display = "block";
 }
+
 function closePlateImageModal() {
-  document.getElementById("imgModal").style.display = "none";
+  document.getElementById("imgDetailsModal").style.display = "none";
+}
+
+// Generic Confirmation Modal
+function showConfirm(message, onConfirm) {
+  document.getElementById("confirmMessage").textContent = message;
+  const modal = document.getElementById("confirmModal");
+  modal.style.display = "block";
+
+  document.getElementById("confirmYes").onclick = () => {
+    modal.style.display = "none";
+    onConfirm();
+  };
+  document.getElementById("confirmNo").onclick = () => {
+    modal.style.display = "none";
+  };
+}
+
+// Update Plate with Confirmation
+function confirmUpdatePlate(id) {
+  showConfirm(`آیا از بروزرسانی پلاک ${id} مطمئنید؟`, async () => {
+    const newPlate = document.getElementById("editPlateText").value;
+    await fetch(`/plates/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plate_text: newPlate }),
+    });
+    showToast("پلاک بروزرسانی شد");
+    fetchPlates();
+    closePlateImageModal();
+  });
+}
+
+// Delete Plate with Confirmation
+function confirmDeletePlate(id) {
+  showConfirm(`آیا از حذف پلاک ${id} مطمئنید؟`, async () => {
+    await fetch(`/plates/${id}`, { method: "DELETE" });
+    showToast("پلاک حذف شد");
+    fetchPlates();
+    closePlateImageModal();
+  });
 }
 
 // -------------- Plate Modal
@@ -191,3 +259,14 @@ function toFarsiNumber(str) {
   const farsiDigits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
   return String(str).replace(/\d/g, (d) => farsiDigits[d]);
 }
+
+window.onclick = function (event) {
+  const imgModal = document.getElementById("imgDetailsModal");
+  if (event.target == imgModal) closePlateImageModal();
+
+  const addPlateModal = document.getElementById("addPlateModal");
+  if (event.target == addPlateModal) closeAddPlateModal();
+
+  const confirmModal = document.getElementById("confirmModal");
+  if (event.target == confirmModal) confirmModal.style.display = "none";
+};

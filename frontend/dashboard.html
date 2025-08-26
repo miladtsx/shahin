@@ -85,10 +85,61 @@
       <img id="modalImg" class="modal-content" />
     </div>
 
+    <!-- Image Details Modal -->
+    <div id="imgDetailsModal" class="modal">
+      <div
+        class="modal-content"
+        style="width: 90%; max-width: 800px; position: relative"
+      >
+        <!-- Close button -->
+        <span
+          onclick="closePlateImageModal()"
+          style="
+            position: absolute;
+            top: 2px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 42px;
+          "
+          >&times;</span
+        >
+
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <img
+            id="modalLargeImg"
+            style="width: 100%; max-height: 400px; object-fit: contain"
+          />
+          <div
+            id="modalDetails"
+            style="background: #fff; padding: 15px; border-radius: 6px"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+      <div
+        class="modal-content"
+        style="
+          background: white;
+          padding: 20px;
+          max-width: 400px;
+          border-radius: 8px;
+          margin: 15% auto;
+        "
+      >
+        <p id="confirmMessage" style="margin-bottom: 20px"></p>
+        <div style="display: flex; justify-content: space-between">
+          <button id="confirmYes">تایید</button>
+          <button id="confirmNo" style="background: #dc3545">لغو</button>
+        </div>
+      </div>
+    </div>
+
     <script
       src="{{ url_for('static', filename='dashboard.js') }}"
       defer
     ></script>
-
   </body>
 </html>

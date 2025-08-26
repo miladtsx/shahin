@@ -209,3 +209,11 @@ tr:hover {
     margin-left: 10px;
     margin-right: 10px;
 }
+
+#imgDetailsModal .modal-content {
+  background: #f4f4f9;
+  border-radius: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  max-height: 90%;
+}
