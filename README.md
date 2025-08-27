@@ -26,6 +26,12 @@ pip install -r requirements.txt
 
 ## Demo Setup
 
+### Fake plates
+```sh
+$ make seed-db
+$ make web
+```
+
 - Download [MediaMTX](https://github.com/bluenviron/mediamtx/releases)
 
 ```sh

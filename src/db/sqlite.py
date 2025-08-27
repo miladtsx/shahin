@@ -65,13 +65,12 @@ class DB:
 
     logger.info("db_stopped")
 
-    def insert_plate(self, vid: int, file_path: str, plate_text: str):
+    def insert_plate(self, vid: int, file_path: str | None, plate_text: str):
         # Validate input
         if (
             not isinstance(vid, int)
             or vid < 1
             or vid > 2**31 - 1
-            or not isinstance(file_path, str)
             or not isinstance(plate_text, str)
             or len(plate_text) < 7
         ):
