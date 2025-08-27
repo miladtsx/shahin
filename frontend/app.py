@@ -22,21 +22,39 @@ def index():
     return render_template("dashboard.html")
 
 
-@app.route('/out/<path:filename>')
+@app.route("/out/<path:filename>")
 def serve_out_files(filename):
-    return send_from_directory(os.path.join(BASE_DIR, '../out/'), filename)
+    return send_from_directory(os.path.join(BASE_DIR, "../out/"), filename)
 
 
 @app.route("/plates", methods=["GET"])
 def list_plates():
     limit = int(request.args.get("limit", 50))
+    plate_text = request.args.get("plate_text", "").strip()
+    start_ts = request.args.get("start_ts")
+    end_ts = request.args.get("end_ts")
+
+    query = (
+        "SELECT id, vehicle_id, image_path, plate_text, timestamp FROM plates WHERE 1=1"
+    )
+    params = []
+
+    if plate_text:
+        query += " AND plate_text LIKE ?"
+        params.append(f"%{plate_text}%")
+    if start_ts:
+        query += " AND timestamp >= ?"
+        params.append(start_ts)
+    if end_ts:
+        query += " AND timestamp <= ?"
+        params.append(end_ts)
+
+    query += " ORDER BY timestamp DESC LIMIT ?"
+    params.append(limit)
+
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT id, vehicle_id, image_path, plate_text, timestamp "
-            "FROM plates ORDER BY timestamp DESC LIMIT ?",
-            (limit,),
-        )
+        cur.execute(query, params)
         rows = cur.fetchall()
     return jsonify(
         [

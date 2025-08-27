@@ -68,7 +68,7 @@ button {
 }
 
 button:hover {
-    background: #0056b3;
+    background: #0057b3ac;
     transform: scale(1.05);
 }
 
@@ -95,7 +95,7 @@ tr:hover {
 }
 
 .actions button {
-    background: #dc3545;
+    background: #c9bdbe;
 }
 
 .actions button:hover {
@@ -305,22 +305,47 @@ tr:hover {
     opacity: 0.85;
 }
 
+
+.plate_delete_modal_container {
+    background: white;
+    padding: 20px;
+    max-width: 400px;
+    border-radius: 8px;
+    margin: 15% auto;
+    position: relative;
+    margin: 10% auto;
+}
+
+.plate_delete_modal {
+    display: flex;
+    justify-content: space-between
+}
+
+.plate_modal_btn {
+    width: 20%;
+    height: 20%;
+    text-align: center;
+    font-size: large;
+    font-weight: bold;
+}
+
 .plateTextModalContainer {
     display: flex;
     justify-content: center;
     padding-bottom: 25px;
     font-size: xx-large;
 }
+
 .plateTextModal {
     font-size: xx-large;
     font-weight: bolder;
 }
 
-
-
 .new_plate {
     font-size: 2rem;
-    width: 8%;
+    background: wheat;
+    color: black;
+    width: 85px;
     text-align: center;
     justify-content: center;
 }
@@ -339,6 +364,20 @@ tr:hover {
 }
 
 .card_header {
-    text-align: center;
+    display: flex;
+    gap: 25px;
+    justify-content: center;
     margin-bottom: 10px;
+}
+
+/* Filtering */
+.toggleFilterBtn {
+    float: left;
+    font-size: 18px;
+    background: wheat;
+    padding: 6px 12px;
+    font-size: 2rem;
+    width: 75px;
+    text-align: center;
+    justify-content: center;
 }

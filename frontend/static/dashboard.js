@@ -1,8 +1,8 @@
 window.onload = fetchPlates;
 
 // CRUD
-async function fetchPlates() {
-  const res = await fetch("/plates");
+async function fetchPlates(query = "") {
+  const res = await fetch(`/plates?${query}`);
   const data = await res.json();
   const tbody = document.getElementById("plates_body");
   tbody.innerHTML = "";
@@ -287,3 +287,41 @@ window.onclick = function (event) {
   const confirmModal = document.getElementById("confirmModal");
   if (event.target == confirmModal) confirmModal.style.display = "none";
 };
+
+// Filtering
+let filtersVisible = false;
+
+function toggleFilterBar() {
+  filtersVisible = !filtersVisible;
+  document.getElementById("filterBar").style.display = filtersVisible
+    ? "block"
+    : "none";
+}
+
+function applyFilters() {
+  const plate = document.getElementById("filterPlate").value;
+  const start = document.getElementById("filterStart").value;
+  const end = document.getElementById("filterEnd").value;
+
+  const params = new URLSearchParams();
+  if (plate) params.append("plate_text", toFarsiNumber(plate));
+  if (start) params.append("start_ts", start);
+  if (end) params.append("end_ts", end);
+
+  fetchPlates(params.toString());
+}
+
+function clearFilters() {
+  document.getElementById("filterPlate").value = "";
+  document.getElementById("filterStart").value = "";
+  document.getElementById("filterEnd").value = "";
+  fetchPlates();
+}
+
+document
+  .getElementById("filterPlate")
+  .addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      applyFilters(this.value.trim());
+    }
+  });

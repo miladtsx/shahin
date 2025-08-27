@@ -101,7 +101,7 @@ class OnlineBestFrameSelector:
             if idx == 2:
                 class_id = classifier.classify_alphabet(g).get("class_name")
             else:
-                class_id = classifier.classify_digit(g).get("class_name")
+                class_id = to_farsi_number(classifier.classify_digit(g).get("class_name"))
             return idx, str(class_id) if class_id is not None else ""
 
         with ThreadPoolExecutor() as executor:
@@ -123,3 +123,9 @@ class OnlineBestFrameSelector:
             db.stop()
 
         return final_plate_text
+
+
+
+def to_farsi_number(s):
+    farsi_digits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"]
+    return ''.join(farsi_digits[int(ch)] if ch.isdigit() else ch for ch in str(s))

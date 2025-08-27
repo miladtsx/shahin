@@ -20,6 +20,17 @@
       <div class="card">
         <div class="card_header">
           <button class="new_plate" onclick="openAddPlateModal()">+</button>
+          <button class="toggleFilterBtn" onclick="toggleFilterBar()">
+            🔍
+          </button>
+        </div>
+
+        <div id="filterBar" style="display: none; margin-bottom: 10px">
+          <input id="filterPlate" placeholder="جستجوی پلاک" />
+          <input id="filterStart" type="datetime-local" />
+          <input id="filterEnd" type="datetime-local" />
+          <button onclick="applyFilters()">اعمال فیلتر</button>
+          <button onclick="clearFilters()">&times;</button>
         </div>
 
         <table>
@@ -48,7 +59,11 @@
     <div id="addPlateModal" class="modal">
       <div class="modal_content">
         <h3>ثبت پلاک جدید</h3>
-        <input style="margin-right: 35px; margin-top: 35px;" id="modal_plate_text" placeholder="شماره پلاک را وارد کنید" />
+        <input
+          style="margin-right: 35px; margin-top: 35px"
+          id="modal_plate_text"
+          placeholder="شماره پلاک را وارد کنید"
+        />
         <div style="margin-top: 50px; text-align: center">
           <div style="margin-top: 50px; display: flex; gap: 200px">
             <button id="submitBtn" onclick="submitAddPlate()" style="flex: 1">
@@ -81,20 +96,26 @@
 
     <!-- Confirmation Modal -->
     <div id="confirmModal" class="modal">
-      <div
-        class="modal_content"
-        style="
-          background: white;
-          padding: 20px;
-          max-width: 400px;
-          border-radius: 8px;
-          margin: 15% auto;
-        "
-      >
-        <p id="confirmMessage" style="margin-bottom: 20px"></p>
-        <div style="display: flex; justify-content: space-between">
-          <button id="confirmYes">تایید</button>
-          <button id="confirmNo" style="background: #dc3545">لغو</button>
+      <div class="plate_delete_modal_container">
+        <p
+          id="confirmMessage"
+          style="margin-bottom: 20px; font-size: x-large"
+        ></p>
+        <div class="plate_delete_modal">
+          <button
+            id="confirmYes"
+            class="plate_modal_btn"
+            style="background: #dc3545"
+          >
+            بله
+          </button>
+          <button
+            id="confirmNo"
+            class="plate_modal_btn"
+            style="background: #7c7878"
+          >
+            خیر
+          </button>
         </div>
       </div>
     </div>
