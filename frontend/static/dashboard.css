@@ -18,12 +18,6 @@
     font-style: normal;
 }
 
-html,
-body {
-    overflow: hidden;
-    /* prevent page scroll */
-}
-
 /* Base Font */
 body,
 input,
@@ -206,24 +200,39 @@ table th {
     color: #fff;
 }
 
+table img {
+    width: 128px;
+    height: 32px;
+    cursor: pointer;
+}
+
 tr:hover {
     background: var(--table-row-hover);
 }
 
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
 
 /* Pagination & Per-Page */
 .pagination-container {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     margin-top: 20px;
 }
 
 .per-page-select {
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 1rem;
+    font-size: 13px;
+}
+
+.per-page-select select {
+    font-size: small;
+    padding: 5px;
 }
 
 .pagination-controls {
@@ -231,7 +240,11 @@ tr:hover {
     gap: 10px;
     justify-content: center;
     align-items: center;
-    padding-top: 25px;
+}
+
+.pagination-controls button {
+    font-size: small;
+    padding: 5px;
 }
 
 
@@ -294,6 +307,11 @@ h1 {
     padding: 20px;
 }
 
+.container a {
+    text-decoration: none;
+    color: black
+}
+
 /* Header */
 .header {
     display: flex;
@@ -336,7 +354,6 @@ h1 {
     font-size: 1rem;
     transition: 0.3s;
     transition: background 0.3s, transform 0.2s, box-shadow 0.2s;
-
 }
 
 .button:hover {
@@ -345,6 +362,10 @@ h1 {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
+.btn-delete {
+    border: 1px solid black;
+    color: rgb(195, 3, 3);
+}
 
 .toggle-filter {
     background: #17a2b8;
@@ -568,4 +589,26 @@ tr:hover {
 
 .center-text {
     text-align: center;
+}
+
+footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #222222;
+    padding: 8px 0;
+    color: #fff;
+    font-size: 14px;
+    text-align: center;
+}
+
+footer a {
+    position: absolute;
+    top: 50%;
+    left: 20px;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: #fff;
+    text-decoration: none;
 }

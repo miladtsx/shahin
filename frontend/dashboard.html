@@ -12,10 +12,12 @@
   <body>
     <div class="container">
       <!-- Header -->
-      <div class="header">
-        <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" />
-        <h1>شاهین — سامانه رهگیری پلاک خودرو</h1>
-      </div>
+      <a href="https://tally.so/r/nWL0Yv" target="_blank">
+        <div class="header">
+          <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" />
+          <h1>شاهین — سامانه رهگیری پلاک خودرو</h1>
+        </div>
+      </a>
 
       <!-- Main Card -->
       <div class="card">
@@ -43,7 +45,7 @@
             <input id="filterStart" type="datetime-local" />
             <input id="filterEnd" type="datetime-local" />
             <button class="button apply-filter-btn" onclick="applyFilters()">
-              اعمال فیلتر
+              فیلتر
             </button>
             <button class="button clear-filter-btn" onclick="clearFilters()">
               &times;
@@ -74,18 +76,18 @@
                 <option value="5">5</option>
                 <option value="10">10</option>
                 <option value="100">100</option>
-                <option value="1000">1000</option>
+                <option value="200">200</option>
               </select>
             </label>
           </div>
 
           <div class="pagination-controls">
-            <button class="button" id="prevPageBtn" onclick="changePage(-1)">
-              قبلی
-            </button>
-            <span id="pageInfo">صفحه 1</span>
             <button class="button" id="nextPageBtn" onclick="changePage(1)">
               بعدی
+            </button>
+            <span id="pageInfo">صفحه 1</span>
+            <button class="button" id="prevPageBtn" onclick="changePage(-1)">
+              قبلی
             </button>
           </div>
         </div>
@@ -171,4 +173,14 @@
       defer
     ></script>
   </body>
+  <footer>
+    © ۱۴۰۴ شاهین &mdash; تمامی حقوق محفوظ می‌باشد.
+
+    <a
+      href="https://tally.so/r/nWL0Yv"
+      target="_blank"
+    >
+      ☎
+    </a>
+  </footer>
 </html>
