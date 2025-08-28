@@ -18,6 +18,12 @@
     font-style: normal;
 }
 
+html,
+body {
+    overflow: hidden;
+    /* prevent page scroll */
+}
+
 /* Base Font */
 body,
 input,
@@ -283,7 +289,7 @@ h1 {
 
 /* Container */
 .container {
-    max-width: 1200px;
+    max-width: 90%;
     margin: 0 auto;
     padding: 20px;
 }
@@ -301,11 +307,14 @@ h1 {
 }
 
 .card {
+    display: flex;
     background: #fff;
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     margin-bottom: 20px;
+    flex-direction: column;
+    max-height: 70vh;
 }
 
 /* Card Header Buttons */
@@ -369,13 +378,30 @@ table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
+
+    display: block;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+
+table thead,
+table tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+table th,
+table td {
+    text-align: center;
+    vertical-align: middle;
 }
 
 th,
 td {
     padding: 12px;
     border-bottom: 1px solid #ddd;
-    text-align: left;
 }
 
 th {
