@@ -2,6 +2,7 @@ window.onload = fetchPlates;
 
 let CURRENT_PAGE = 1;
 let CURRENT_PER_PAGE = 5;
+let TOTAL_PAGES = 0;
 let CURRENT_FILTERS = {}; // keep filters for export and paging
 
 // CRUD
@@ -25,10 +26,12 @@ async function fetchPlates(query = "") {
     total: data.length,
   };
 
+  TOTAL_PAGES = Math.max(1, Math.ceil(meta.total / meta.per_page));
+
   // update page UI
-  document.getElementById("pageInfo").textContent = `صفحه ${
-    meta.page
-  } از ${Math.max(1, Math.ceil(meta.total / meta.per_page))}`;
+  document.getElementById(
+    "pageInfo"
+  ).textContent = `صفحه ${meta.page} از ${TOTAL_PAGES}`;
 
   const tbody = document.getElementById("plates_body");
   tbody.innerHTML = "";
@@ -50,11 +53,9 @@ async function fetchPlates(query = "") {
     const imgTd = document.createElement("td");
     imgTd.innerHTML = `<img src="../../${
       p.image_path
-    }" style="width:128px;height:32px;cursor:pointer;" 
-onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(p).replace(
-      /"/g,
-      "&quot;"
-    )})'>`;
+    }" onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(
+      p
+    ).replace(/"/g, "&quot;")})'>`;
     tr.appendChild(imgTd);
 
     // Plate glyphs cell
@@ -69,7 +70,7 @@ onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(p).replace(
     <div>
       <span>${toFarsiNumber(date.toLocaleDateString())}</span>
       <br/>
-      <span style="margin-left: 16px;">${toFarsiNumber(
+      <span>${toFarsiNumber(
         date.toLocaleTimeString([], { hour12: false })
       )}</span>
     </div>
@@ -79,7 +80,11 @@ onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(p).replace(
     // Actions cell
     const actTd = document.createElement("td");
     actTd.className = "actions";
-    actTd.innerHTML = `<button onclick="deletePlate(${p.id})">حذف</button>`;
+    actTd.innerHTML = `
+    <div class="action-buttons">
+      <button class="button btn-delete" onclick="deletePlate(${p.id})">حذف</button>
+    </div>
+    `;
     tr.appendChild(actTd);
 
     tbody.appendChild(tr);
@@ -96,8 +101,13 @@ function onPerPageChange() {
 }
 
 function changePage(delta) {
-  CURRENT_PAGE = Math.max(1, CURRENT_PAGE + delta);
-  fetchPlates();
+  if (CURRENT_PAGE < TOTAL_PAGES && delta > 0) {
+    CURRENT_PAGE++;
+    fetchPlates();
+  } else if (CURRENT_PAGE > 1 && delta < 0) {
+    CURRENT_PAGE--;
+    fetchPlates();
+  }
 }
 
 function openPlateImageModal(src, plateData) {
@@ -121,9 +131,9 @@ function openPlateImageModal(src, plateData) {
       <button class="button new-plate" onclick="confirmUpdatePlate(${
         plateData.id
       })">بروزرسانی</button>
-      <button class="button" onclick="confirmDeletePlate(${
+      <button class="button btn-delete" onclick="confirmDeletePlate(${
         plateData.id
-      })" style="background:#dc3545;">حذف</button>
+      })">حذف</button>
     </div>
   `;
 
@@ -152,17 +162,20 @@ function showConfirm(message, onConfirm) {
 
 // Update Plate with Confirmation
 function confirmUpdatePlate(id) {
-  showConfirm(`آیا از بروزرسانی پلاک ${toFarsiNumber(id)} مطمئنید؟`, async () => {
-    const newPlate = document.getElementById("editPlateText").value;
-    await fetch(`/plates/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plate_text: newPlate }),
-    });
-    showToast("پلاک بروزرسانی شد");
-    fetchPlates();
-    closePlateImageModal();
-  });
+  showConfirm(
+    `آیا از بروزرسانی پلاک ${toFarsiNumber(id)} مطمئنید؟`,
+    async () => {
+      const newPlate = document.getElementById("editPlateText").value;
+      await fetch(`/plates/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plate_text: newPlate }),
+      });
+      showToast("پلاک بروزرسانی شد");
+      fetchPlates();
+      closePlateImageModal();
+    }
+  );
 }
 
 // Delete Plate with Confirmation
