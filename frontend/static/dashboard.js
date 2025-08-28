@@ -42,9 +42,9 @@ async function fetchPlates(query = "") {
     tr.appendChild(idTd);
 
     // VID cell
-    const vidTd = document.createElement("td");
-    vidTd.textContent = p.vehicle_id;
-    tr.appendChild(vidTd);
+    // const vidTd = document.createElement("td");
+    // vidTd.textContent = p.vehicle_id;
+    // tr.appendChild(vidTd);
 
     // Image cell
     const imgTd = document.createElement("td");
@@ -66,10 +66,13 @@ onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(p).replace(
     const tsTd = document.createElement("td");
     const date = new Date(p.timestamp);
     tsTd.innerHTML = `
-      <div>${toFarsiNumber(date.toLocaleDateString())}</div>
-      <div>${toFarsiNumber(
+    <div>
+      <span>${toFarsiNumber(date.toLocaleDateString())}</span>
+      <br/>
+      <span style="margin-left: 16px;">${toFarsiNumber(
         date.toLocaleTimeString([], { hour12: false })
-      )}</div>
+      )}</span>
+    </div>
     `;
     tr.appendChild(tsTd);
 
@@ -110,21 +113,21 @@ function openPlateImageModal(src, plateData) {
     <p>شناسه: ${toFarsiNumber(plateData.id)}</p>
     <p>نام فایل: ${plateData.vehicle_id}</p>
     <div class="plateTextModalContainer">
-    <p>پلاک: <input id="editPlateText" class="plateTextModal"  value="${
+    <p><strong>شماره پلاک:</strong> <input class="center-text" id="editPlateText" value="${
       plateData.plate_text
-    }"</p>
+    }"></p>
     </div>
-    <div class="modalButtons">
-      <button class="updateBtn" onclick="confirmUpdatePlate(${
+    <div class="modal-actions">
+      <button class="button new-plate" onclick="confirmUpdatePlate(${
         plateData.id
       })">بروزرسانی</button>
-      <button class="deleteBtn" onclick="confirmDeletePlate(${
+      <button class="button" onclick="confirmDeletePlate(${
         plateData.id
       })" style="background:#dc3545;">حذف</button>
     </div>
   `;
 
-  document.getElementById("imgDetailsModal").style.display = "block";
+  document.getElementById("imgDetailsModal").style.display = "flex";
   document.getElementById("editPlateText").focus();
 }
 
@@ -136,7 +139,7 @@ function closePlateImageModal() {
 function showConfirm(message, onConfirm) {
   document.getElementById("confirmMessage").textContent = message;
   const modal = document.getElementById("confirmModal");
-  modal.style.display = "block";
+  modal.style.display = "flex";
 
   document.getElementById("confirmYes").onclick = () => {
     modal.style.display = "none";
@@ -149,7 +152,7 @@ function showConfirm(message, onConfirm) {
 
 // Update Plate with Confirmation
 function confirmUpdatePlate(id) {
-  showConfirm(`آیا از بروزرسانی پلاک ${id} مطمئنید؟`, async () => {
+  showConfirm(`آیا از بروزرسانی پلاک ${toFarsiNumber(id)} مطمئنید؟`, async () => {
     const newPlate = document.getElementById("editPlateText").value;
     await fetch(`/plates/${id}`, {
       method: "PUT",
@@ -164,7 +167,7 @@ function confirmUpdatePlate(id) {
 
 // Delete Plate with Confirmation
 function confirmDeletePlate(id) {
-  showConfirm(`آیا از حذف پلاک ${id} مطمئنید؟`, async () => {
+  showConfirm(`آیا از حذف پلاک ${toFarsiNumber(id)} مطمئنید؟`, async () => {
     await fetch(`/plates/${id}`, { method: "DELETE" });
     showToast("پلاک حذف شد");
     fetchPlates();
@@ -197,7 +200,7 @@ async function updatePlate(id, inputElem) {
   };
   // if (!confirm(`Update record ${id}?`)) return;
   showConfirm(
-    `آیا از بروزرسانی پلاک ${id} مطمئنید؟`,
+    `آیا از بروزرسانی پلاک ${toFarsiNumber(id)} مطمئنید؟`,
     await fetch(`/plates/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -252,7 +255,7 @@ function showToast(message) {
 
 // Add plate modal
 function openAddPlateModal() {
-  document.getElementById("addPlateModal").style.display = "block";
+  document.getElementById("addPlateModal").style.display = "flex";
   document.getElementById("modal_plate_text").focus();
 }
 
@@ -364,7 +367,8 @@ function clearFilters() {
   document.getElementById("filterPlate").value = "";
   document.getElementById("filterStart").value = "";
   document.getElementById("filterEnd").value = "";
-  CURRENT_FILTERS = {}
+  CURRENT_FILTERS = {};
+  toggleFilterBar();
   fetchPlates();
 }
 
@@ -384,7 +388,6 @@ window.onload = () => {
   document.getElementById("perPageSelect").value = String(CURRENT_PER_PAGE);
   fetchPlates();
 };
-
 
 document
   .getElementById("filterPlate")

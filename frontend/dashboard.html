@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>شاهین</title>
-
+    <title>شاهین — سامانه رهگیری پلاک خودرو</title>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='dashboard.css') }}"
@@ -12,104 +11,121 @@
   </head>
   <body>
     <div class="container">
+      <!-- Header -->
       <div class="header">
         <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" />
-        <h1>شاهین &mdash; سامانه رهگیری پلاک خودرو</h1>
+        <h1>شاهین — سامانه رهگیری پلاک خودرو</h1>
       </div>
 
+      <!-- Main Card -->
       <div class="card">
-        <div class="card_header">
-          <button class="new_plate" onclick="openAddPlateModal()">+</button>
-          <button class="toggleFilterBtn" onclick="toggleFilterBar()">
-            🔍
+        <!-- Card Header -->
+        <div class="card-header">
+          <button class="button new-plate" onclick="openAddPlateModal()">
+            افزودن
           </button>
-
-          <!-- export button -->
-          <button class="exportBtn" title="استخراج CSV" onclick="exportCSV()">
-            ⤓
+          <button class="button toggle-filter" onclick="toggleFilterBar()">
+            فیلتر
+          </button>
+          <button
+            class="button export-btn"
+            title="استخراج CSV"
+            onclick="exportCSV()"
+          >
+            خروجی CSV
           </button>
         </div>
 
-        <div id="filterBar" style="display: none; margin-bottom: 10px">
-          <input id="filterPlate" placeholder="جستجوی پلاک" />
-          <input id="filterStart" type="datetime-local" />
-          <input id="filterEnd" type="datetime-local" />
-          <button onclick="applyFilters()">اعمال فیلتر</button>
-          <button onclick="clearFilters()">&times;</button>
+        <!-- Filter Bar -->
+        <div id="filterBar" class="filter-bar">
+          <div class="filter-buttons">
+            <input id="filterPlate" placeholder="جستجوی پلاک" />
+            <input id="filterStart" type="datetime-local" />
+            <input id="filterEnd" type="datetime-local" />
+            <button class="button apply-filter-btn" onclick="applyFilters()">
+              اعمال فیلتر
+            </button>
+            <button class="button clear-filter-btn" onclick="clearFilters()">
+              &times;
+            </button>
+          </div>
         </div>
 
+        <!-- Plates Table -->
         <table>
           <thead>
             <tr>
               <th>شناسه</th>
-              <th>VID</th>
               <th>تصویر</th>
               <th>شماره</th>
               <th>زمان ثبت</th>
               <th>عملیات</th>
             </tr>
           </thead>
-          <tbody id="plates_body"></tbody>
+          <tbody class="center-text" id="plates_body"></tbody>
         </table>
 
-        <div style="display: columns; justify-content: center">
-          <!-- per-page selector -->
-          <label style="align-self: center">
-            <select id="perPageSelect" onchange="onPerPageChange()">
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="100">100</option>
-              <option value="1000">1,000</option>
-            </select>
-          </label>
+        <!-- Pagination -->
+        <div class="pagination-container">
+          <div class="per-page-select">
+            <label>
+              نمایش در هر صفحه:
+              <select id="perPageSelect" onchange="onPerPageChange()">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="100">100</option>
+                <option value="1000">1000</option>
+              </select>
+            </label>
+          </div>
 
-          <!--  pagination controls  -->
-          <div
-            style="
-              display: flex;
-              justify-content: center;
-              gap: 12px;
-              margin-top: 12px;
-              align-items: center;
-            "
-          >
-            <button id="nextPageBtn" onclick="changePage(1)">بعدی</button>
+          <div class="pagination-controls">
+            <button class="button" id="prevPageBtn" onclick="changePage(-1)">
+              قبلی
+            </button>
             <span id="pageInfo">صفحه 1</span>
-            <button id="prevPageBtn" onclick="changePage(-1)">قبلی</button>
+            <button class="button" id="nextPageBtn" onclick="changePage(1)">
+              بعدی
+            </button>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Toast -->
     <div id="toast"></div>
 
+    <!-- Image Modal -->
     <div id="imgModal" class="modal" onclick="closePlateImageModal()">
-      <img id="modalImg" class="modal_content" />
+      <img id="modalImg" class="modal-content" />
     </div>
 
-    <!-- Add New Plate Modal -->
+    <!-- Add Plate Modal -->
     <div id="addPlateModal" class="modal">
-      <div class="modal_content">
+      <div class="modal-content">
         <h3>ثبت پلاک جدید</h3>
         <input
-          style="margin-right: 35px; margin-top: 35px"
           id="modal_plate_text"
+          maxlength="7"
+          maxlength="7"
           placeholder="شماره پلاک را وارد کنید"
         />
-        <div style="margin-top: 50px; text-align: center">
-          <div style="margin-top: 50px; display: flex; gap: 200px">
-            <button id="submitBtn" onclick="submitAddPlate()" style="flex: 1">
-              ثبت
-            </button>
-            <button
-              onclick="closeAddPlateModal()"
-              style="flex: 1; background: #dc3545"
-            >
-              لغو
-            </button>
-          </div>
+        <div class="modal-actions">
+          <button
+            id="submitBtn"
+            class="button new-plate"
+            onclick="submitAddPlate()"
+          >
+            ثبت
+          </button>
+          <button
+            class="button clear-filter-btn"
+            onclick="closeAddPlateModal()"
+          >
+            لغو
+          </button>
         </div>
-        <span onclick="closeAddPlateModal()" class="modal_close">&times;</span>
+        <span class="modal-close" onclick="closeAddPlateModal()">&times;</span>
       </div>
     </div>
 
@@ -121,30 +137,28 @@
         >
         <div class="modal-body">
           <img id="modalLargeImg" />
-          <div id="modalDetails"></div>
+          <div class="modalDetails" id="modalDetails"></div>
         </div>
       </div>
     </div>
 
     <!-- Confirmation Modal -->
     <div id="confirmModal" class="modal">
-      <div class="plate_delete_modal_container">
-        <p
-          id="confirmMessage"
-          style="margin-bottom: 20px; font-size: x-large"
-        ></p>
-        <div class="plate_delete_modal">
+      <div class="modal-content">
+        <p id="confirmMessage"></p>
+        <!-- <div class="plate-delete-modal"> -->
+        <div class="modal-actions">
           <button
             id="confirmYes"
-            class="plate_modal_btn"
-            style="background: #dc3545"
+            class="button new-plate"
+            onclick="submitAddPlate()"
           >
             بله
           </button>
           <button
             id="confirmNo"
-            class="plate_modal_btn"
-            style="background: #7c7878"
+            class="button clear-filter-btn"
+            onclick="closeAddPlateModal()"
           >
             خیر
           </button>
