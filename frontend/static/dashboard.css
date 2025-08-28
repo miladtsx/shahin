@@ -381,3 +381,15 @@ tr:hover {
     text-align: center;
     justify-content: center;
 }
+
+/* Export CSV */
+.exportBtn {
+    float: left;
+    font-size: 18px;
+    background: wheat;
+    padding: 6px 12px;
+    font-size: 2rem;
+    width: 75px;
+    text-align: center;
+    justify-content: center;
+}

@@ -1,9 +1,35 @@
 window.onload = fetchPlates;
 
+let CURRENT_PAGE = 1;
+let CURRENT_PER_PAGE = 5;
+let CURRENT_FILTERS = {}; // keep filters for export and paging
+
 // CRUD
 async function fetchPlates(query = "") {
-  const res = await fetch(`/plates?${query}`);
-  const data = await res.json();
+  const qs = query
+    ? query
+    : new URLSearchParams({
+        page: CURRENT_PAGE,
+        per_page: CURRENT_PER_PAGE,
+        plate_text: CURRENT_FILTERS.plate_text || "",
+        start_ts: CURRENT_FILTERS.start_ts || "",
+        end_ts: CURRENT_FILTERS.end_ts || "",
+      }).toString();
+
+  const res = await fetch(`/plates?${qs}`);
+  const payload = await res.json();
+  const data = payload.items || payload;
+  const meta = payload.meta || {
+    page: 1,
+    per_page: data.length,
+    total: data.length,
+  };
+
+  // update page UI
+  document.getElementById("pageInfo").textContent = `صفحه ${
+    meta.page
+  } از ${Math.max(1, Math.ceil(meta.total / meta.per_page))}`;
+
   const tbody = document.getElementById("plates_body");
   tbody.innerHTML = "";
 
@@ -55,6 +81,20 @@ onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(p).replace(
 
     tbody.appendChild(tr);
   });
+}
+
+function onPerPageChange() {
+  CURRENT_PER_PAGE = parseInt(
+    document.getElementById("perPageSelect").value,
+    10
+  );
+  CURRENT_PAGE = 1;
+  fetchPlates();
+}
+
+function changePage(delta) {
+  CURRENT_PAGE = Math.max(1, CURRENT_PAGE + delta);
+  fetchPlates();
 }
 
 function openPlateImageModal(src, plateData) {
@@ -304,9 +344,18 @@ function applyFilters() {
   const end = document.getElementById("filterEnd").value;
 
   const params = new URLSearchParams();
-  if (plate) params.append("plate_text", toFarsiNumber(plate));
-  if (start) params.append("start_ts", start);
-  if (end) params.append("end_ts", end);
+  if (plate) {
+    CURRENT_FILTERS.plate_text = toFarsiNumber(plate);
+    params.append("plate_text", toFarsiNumber(plate));
+  }
+  if (start) {
+    CURRENT_FILTERS.start_ts = start;
+    params.append("start_ts", start);
+  }
+  if (end) {
+    CURRENT_FILTERS.end_ts = end;
+    params.append("end_ts", end);
+  }
 
   fetchPlates(params.toString());
 }
@@ -315,8 +364,27 @@ function clearFilters() {
   document.getElementById("filterPlate").value = "";
   document.getElementById("filterStart").value = "";
   document.getElementById("filterEnd").value = "";
+  CURRENT_FILTERS = {}
   fetchPlates();
 }
+
+// export CSV using current filters
+function exportCSV() {
+  const params = new URLSearchParams({
+    plate_text: CURRENT_FILTERS.plate_text || "",
+    start_ts: CURRENT_FILTERS.start_ts || "",
+    end_ts: CURRENT_FILTERS.end_ts || "",
+  }).toString();
+
+  window.open(`/plates/export?${params}`, "_blank");
+}
+
+// initial load
+window.onload = () => {
+  document.getElementById("perPageSelect").value = String(CURRENT_PER_PAGE);
+  fetchPlates();
+};
+
 
 document
   .getElementById("filterPlate")

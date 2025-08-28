@@ -1,8 +1,9 @@
+from io import StringIO
 import os
 import sqlite3
 import webbrowser
-from flask import Flask, request, jsonify, send_from_directory, render_template
-from threading import Thread
+from flask import Flask, request, jsonify, send_from_directory, render_template, Response
+import csv
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "../res/db/plates.db")
@@ -29,7 +30,19 @@ def serve_out_files(filename):
 
 @app.route("/plates", methods=["GET"])
 def list_plates():
-    limit = int(request.args.get("limit", 50))
+    # pagination
+    try:
+        per_page = int(request.args.get("per_page", 5))
+    except ValueError:
+        per_page = 5
+    per_page = max(1, min(per_page, 200))  # clamp 1..200
+    try:
+        page = int(request.args.get("page", 1))
+    except ValueError:
+        page = 1
+    page = max(1, page)
+    offset = (page - 1) * per_page
+
     plate_text = request.args.get("plate_text", "").strip()
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
@@ -38,7 +51,6 @@ def list_plates():
         "SELECT id, vehicle_id, image_path, plate_text, timestamp FROM plates WHERE 1=1"
     )
     params = []
-
     if plate_text:
         query += " AND plate_text LIKE ?"
         params.append(f"%{plate_text}%")
@@ -49,24 +61,43 @@ def list_plates():
         query += " AND timestamp <= ?"
         params.append(end_ts)
 
-    query += " ORDER BY timestamp DESC LIMIT ?"
-    params.append(limit)
+    query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+    params.extend([per_page, offset])
 
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute(query, params)
         rows = cur.fetchall()
+
+        # total count for pagination
+        count_q = "SELECT COUNT(*) FROM plates WHERE 1=1"
+        count_params = []
+        if plate_text:
+            count_q += " AND plate_text LIKE ?"
+            count_params.append(f"%{plate_text}%")
+        if start_ts:
+            count_q += " AND timestamp >= ?"
+            count_params.append(start_ts)
+        if end_ts:
+            count_q += " AND timestamp <= ?"
+            count_params.append(end_ts)
+        cur.execute(count_q, count_params)
+        total = cur.fetchone()[0]
+
     return jsonify(
-        [
-            {
-                "id": r[0],
-                "vehicle_id": r[1],
-                "image_path": r[2] or "./static/plate_raw.jpg",
-                "plate_text": r[3],
-                "timestamp": r[4],
-            }
-            for r in rows
-        ]
+        {
+            "items": [
+                {
+                    "id": r[0],
+                    "vehicle_id": r[1],
+                    "image_path": r[2] or "./static/plate_raw.jpg",
+                    "plate_text": r[3],
+                    "timestamp": r[4],
+                }
+                for r in rows
+            ],
+            "meta": {"page": page, "per_page": per_page, "total": total},
+        }
     )
 
 
@@ -100,6 +131,44 @@ def delete_plate(pid):
         conn.execute("DELETE FROM plates WHERE id = ?", (pid,))
         conn.commit()
     return jsonify({"status": "deleted"})
+
+# export CSV
+@app.route("/plates/export", methods=["GET"])
+def export_plates_csv():
+    plate_text = request.args.get("plate_text", "").strip()
+    start_ts = request.args.get("start_ts")
+    end_ts = request.args.get("end_ts")
+
+    query = "SELECT id, vehicle_id, image_path, plate_text, timestamp FROM plates WHERE 1=1"
+    params = []
+    if plate_text:
+        query += " AND plate_text LIKE ?"
+        params.append(f"%{plate_text}%")
+    if start_ts:
+        query += " AND timestamp >= ?"
+        params.append(start_ts)
+    if end_ts:
+        query += " AND timestamp <= ?"
+        params.append(end_ts)
+    query += " ORDER BY timestamp DESC"
+
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        rows = cur.fetchall()
+
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(["id", "vehicle_id", "image_path", "plate_text", "timestamp"])
+    for r in rows:
+        writer.writerow(r)
+
+    output = si.getvalue()
+    headers = {
+        "Content-Disposition": "attachment; filename=plates_export.csv",
+        "Content-Type": "text/csv; charset=utf-8",
+    }
+    return Response(output, headers=headers)
 
 
 def run_app():

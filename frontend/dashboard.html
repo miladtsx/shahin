@@ -23,6 +23,11 @@
           <button class="toggleFilterBtn" onclick="toggleFilterBar()">
             🔍
           </button>
+
+          <!-- export button -->
+          <button class="exportBtn" title="استخراج CSV" onclick="exportCSV()">
+            ⤓
+          </button>
         </div>
 
         <div id="filterBar" style="display: none; margin-bottom: 10px">
@@ -46,6 +51,33 @@
           </thead>
           <tbody id="plates_body"></tbody>
         </table>
+
+        <div style="display: columns; justify-content: center">
+          <!-- per-page selector -->
+          <label style="align-self: center">
+            <select id="perPageSelect" onchange="onPerPageChange()">
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="100">100</option>
+              <option value="1000">1,000</option>
+            </select>
+          </label>
+
+          <!--  pagination controls  -->
+          <div
+            style="
+              display: flex;
+              justify-content: center;
+              gap: 12px;
+              margin-top: 12px;
+              align-items: center;
+            "
+          >
+            <button id="nextPageBtn" onclick="changePage(1)">بعدی</button>
+            <span id="pageInfo">صفحه 1</span>
+            <button id="prevPageBtn" onclick="changePage(-1)">قبلی</button>
+          </div>
+        </div>
       </div>
     </div>
 
