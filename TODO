@@ -1,4 +1,22 @@
-[] categorize the glyphs
+[] make program run forever
 [] test page for stream reading
-[] CRUD api for sqlite
-[] build a dashboard to query sqlite reports
+[] refetch list of plates in dashboard every second!
+[] Show total count in the middle bottom of the table
+[] remove redundant plates
+[] https://chatgpt.com/c/68b5af97-d6e8-832d-a353-30fa4d06d500
+[] enable selecting sensitive area in initial configuration
+[] try to detect car entrance or exit
+[] cpu vs gpu, how to tell the difference?
+[] timestamp in application -- as real as possible
+[] save the whole image of sampling plate
+[] car info [type, color] when plate is unknown
+[] try to detect when plate is not detected or 
+    add a confidence score 
+[] record a video of a car with low confidence score
+[] video is dead, let the operator know.
+[] read video when video is available, if camera restarted, just read it and restart.
+[] windows service to make sure app is always on
+[] auto start application, do not ask operator to start backend or dashboard.
+[] common errors reading video streams and make the app resilient.
+[] convert timestamp to local instead of utc
+[] admin dashboard to read stream to enalbe test and sensitive area selection.
