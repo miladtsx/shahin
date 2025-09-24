@@ -10,6 +10,7 @@ from src.common_utils.app_logger import get_logger, log_duration
 
 logger = get_logger("best_frame_selector", logfile="logs/app2.jsonl")
 
+
 class OnlineBestFrameSelector:
     def __init__(
         self,
@@ -68,66 +69,77 @@ class OnlineBestFrameSelector:
 
     def finalize(self, vid):
         """Select the best frame (Save to disk for debugging)."""
-        image_name = f"Vehicle_{vid}_plate.jpg"
-        image_name = os.path.join(self.output_dir, image_name)
-        if vid in self.best_frames:
-            cv2.imwrite(image_name, self.best_frames[vid])
-            # print(f"[Vehicle {vid}] ✅ Finalized and saved best plate")
-        else:
-            logger.debug(f"[Vehicle {vid}] ⚠️ No plate detected, operator input needed")
-
-        # Cleanup
-        self.best_frames.pop(vid, None)
-        self.best_scores.pop(vid, None)
-        self.last_update.pop(vid, None)
-        self.missed_frames.pop(vid, None)
-
-        # downstream processing: use full path for processors
-        preprocessor = PlatePreprocessor()
-        preprocessor.preprocess(image_name)
-
-        segmentation = PlateSegmention()
-        glyphs = segmentation.segment(image_name)
-
-        # Classify
-        if glyphs is None:
-            return
-
-        classifier = GlyphClassifier()
-
-        final_plate_text = [""] * 8
-
-        def classify_glyph(idx_g):
-            idx, g = idx_g
-            # item index 2 is non-digit.
-            if idx == 2:
-                class_id = classifier.classify_alphabet(g).get("class_name")
-            else:
-                class_id = to_farsi_number(classifier.classify_digit(g).get("class_name"))
-            return idx, str(class_id) if class_id is not None else ""
-
-        with ThreadPoolExecutor() as executor:
-            results = executor.map(classify_glyph, glyphs)
-
-        for idx, class_name in results:
-            final_plate_text[idx] = class_name
-
-        # persist result to sqlite DB in the output directory
-        plate_text = "".join(final_plate_text)
-
         try:
+            image_name = f"Vehicle_{vid}_plate.jpg"
+            image_name = os.path.join(self.output_dir, image_name)
+            if vid in self.best_frames:
+                cv2.imwrite(image_name, self.best_frames[vid])
+                # print(f"[Vehicle {vid}] ✅ Finalized and saved best plate")
+            else:
+                logger.debug(
+                    f"[Vehicle {vid}] ⚠️ No plate detected, operator input needed"
+                )
+
+            # Cleanup
+            self.best_frames.pop(vid, None)
+            self.best_scores.pop(vid, None)
+            self.last_update.pop(vid, None)
+            self.missed_frames.pop(vid, None)
+
+            # downstream processing: use full path for processors
+            preprocessor = PlatePreprocessor()
+            preprocessor.preprocess(image_name)
+
+            segmentation = PlateSegmention()
+            glyphs = segmentation.segment(image_name)
+
+            # Classify
+            if glyphs is None:
+                return
+
+            classifier = GlyphClassifier()
+
+            final_plate_text = [""] * 8
+
+            def classify_glyph(idx_g):
+                idx, g = idx_g
+                try:
+                    # item index 2 is non-digit.
+                    if idx == 2:
+                        class_id = classifier.classify_alphabet(g).get("class_name")
+                    else:
+                        class_id = to_farsi_number(
+                            classifier.classify_digit(g).get("class_name")
+                        )
+                    return idx, str(class_id) if class_id is not None else ""
+                except Exception as e:
+                    logger.error(f"Glyph classification failed idx={idx} {e}")
+                    raise
+
+            # with ThreadPoolExecutor() as executor:
+            #     results = executor.map(classify_glyph, glyphs)
+            results = map(classify_glyph, glyphs)
+
+            for idx, class_name in results:
+                final_plate_text[idx] = class_name
+
+            plate_text = "".join(final_plate_text)
+
             db = DB()
-            logger.info(f"db.insert_plate({vid}, {plate_text})")
-            db.insert_plate(vid, plate_text)
+            try:
+                db.insert_plate(vid, plate_text)
+            except Exception as e:
+                logger.error(
+                    f"[Vehicle {vid}] [Plate {plate_text}] ⚠️ Failed to write to DB: {e}"
+                )
+            finally:
+                db.stop()
+
+            return final_plate_text
         except Exception as e:
-            logger.error(f"[Vehicle {vid}] [Plate {plate_text}] ⚠️ Failed to write to DB: {e}")
-        finally:
-            db.stop()
-
-        return final_plate_text
-
+            logger.error(f"[Vehicle {vid}] ⚠️ Failed to finalize track: {e}")
 
 
 def to_farsi_number(s):
     farsi_digits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"]
-    return ''.join(farsi_digits[int(ch)] if ch.isdigit() else ch for ch in str(s))
+    return "".join(farsi_digits[int(ch)] if ch.isdigit() else ch for ch in str(s))
