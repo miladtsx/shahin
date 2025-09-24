@@ -6,10 +6,10 @@ class GlyphClassifier:
         self,
     ):
         self.digit_classifier_model = YOLO(
-            get_resource_path("res/models/digit_classifier_yolov8n.pt"), verbose=False
+            get_resource_path("res/models/digit_classifier_yolov8n.pt"), verbose=False, task="classify"
         )
         self.alphabet_classifier_model = YOLO(
-            get_resource_path("res/models/alphabet_classifier_yolov8n.pt"), verbose=False
+            get_resource_path("res/models/alphabet_classifier_yolov8n.pt"), verbose=False, task="classify"
         )
 
     def classify_digit(self, input_img):
