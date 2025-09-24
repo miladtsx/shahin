@@ -20,3 +20,4 @@
 [] common errors reading video streams and make the app resilient.
 [] convert timestamp to local instead of utc
 [] admin dashboard to read stream to enalbe test and sensitive area selection.
+[] out directory should be unique per each car so they dont overwrite old data
