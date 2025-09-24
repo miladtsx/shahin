@@ -18,11 +18,6 @@ def run_plate_detection():
     conf = Config().config
     db = DB()
 
-    output_dir = get_data_path("detected_plates_dir")
-    # logger.info(
-    #     "run_plate_detection_start", extra={"event": "run_plate_detection_start"}
-    # )
-
     # Init
     with log_duration(logger, "init_components"):
         loader = VideoLoader(conf.get("video_path"))
@@ -39,7 +34,7 @@ def run_plate_detection():
             get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
         )
         tracker = Sort()
-        selector = OnlineBestFrameSelector(score_quality, output_dir)
+        selector = OnlineBestFrameSelector(score_quality)
         executor = ThreadPoolExecutor(max_workers=4)
 
     frame_count = 0

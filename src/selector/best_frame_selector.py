@@ -13,14 +13,10 @@ class OnlineBestFrameSelector:
     def __init__(
         self,
         scorer,
-        output_dir,
         no_improve_patience=10,  # frames without improvement
         track_timeout=10,
     ):  # frames after track disappears
         self.scorer = scorer
-        self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
-
         self.best_frames = {}  # vid -> best_crop
         self.best_scores = defaultdict(lambda: -1.0)
         self.last_update = {}  # vid -> last frame number
