@@ -1,19 +1,14 @@
 import sqlite3
 import threading
 import queue
-from datetime import datetime
-import os
-from src.common_utils.config import Config
 from src.common_utils.app_logger import get_logger, log_duration
+from src.common_utils.resource_path import get_data_path
 
-logger = get_logger("db", logfile="logs/app.jsonl")
+logger = get_logger("database", logfile="logs/app.jsonl")
 
 
 class DB:
     def __init__(self):
-        conf = Config().config
-        self.db_path = conf.get("db_path")
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._task_queue = queue.Queue()
         self._stop_event = threading.Event()
         self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
@@ -21,25 +16,27 @@ class DB:
         with log_duration(logger, "initialize_db"):
             self.initialize_db()
 
+    def get_db_path(self):
+        return get_data_path("plates.db")
+
     def initialize_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.get_db_path()) as conn:
             cur = conn.cursor()
             cur.execute(
                 """
                     CREATE TABLE IF NOT EXISTS plates (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         vehicle_id TEXT,
-                        image_path TEXT,
                         plate_text TEXT,
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
                 """
             )
             conn.commit()
-        logger.info("initialize_db_success", extra={"db_path": self.db_path})
+        logger.info("initialize_db_success", extra={"db_path": self.get_db_path()})
 
     def _writer_loop(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.get_db_path())
         cur = conn.cursor()
         while not self._stop_event.is_set():
             try:
@@ -54,6 +51,7 @@ class DB:
             except Exception as e:
                 logger.exception("db_writer_error", extra={"error": str(e)})
             finally:
+                logger.info("db_writer_task_done", extra={"task": task})
                 self._task_queue.task_done()
         conn.close()
 
@@ -65,7 +63,7 @@ class DB:
 
     logger.info("db_stopped")
 
-    def insert_plate(self, vid: int, file_path: str | None, plate_text: str):
+    def insert_plate(self, vid: int, plate_text: str):
         # Validate input
         if (
             not isinstance(vid, int)
@@ -74,14 +72,19 @@ class DB:
             or not isinstance(plate_text, str)
             or len(plate_text) < 7
         ):
+            logger.exception(
+                "Invalid input types",
+                extra={
+                    "vehicle_id": vid,
+                    "plate_text": plate_text,
+                },
+            )
             raise ValueError("Invalid input types")
 
         self._task_queue.put(
             (
-                "INSERT INTO plates (vehicle_id, image_path, plate_text) VALUES (?, ?, ?)",
-                (str(vid), file_path, plate_text),
+                "INSERT INTO plates (vehicle_id, plate_text) VALUES (?, ?)",
+                (str(vid), plate_text),
             )
         )
-        logger.info(
-            "insert_plate_enqueued", extra={"vehicle_id": vid, "path": file_path}
-        )
+        logger.info("insert_plate_enqueued", extra={"vehicle_id": vid})

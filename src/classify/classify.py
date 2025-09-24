@@ -1,15 +1,15 @@
 from ultralytics import YOLO
-
+from src.common_utils.resource_path import get_resource_path
 
 class GlyphClassifier:
     def __init__(
         self,
     ):
         self.digit_classifier_model = YOLO(
-            "./res/models/digit_classifier_yolov8n.pt", verbose=False
+            get_resource_path("res/models/digit_classifier_yolov8n.pt"), verbose=False
         )
         self.alphabet_classifier_model = YOLO(
-            "./res/models/alphabet_classifier_yolov8n.pt", verbose=False
+            get_resource_path("res/models/alphabet_classifier_yolov8n.pt"), verbose=False
         )
 
     def classify_digit(self, input_img):

@@ -1,12 +1,20 @@
 from io import StringIO
-import os
+import os, sys
 import sqlite3
 import webbrowser
-from flask import Flask, request, jsonify, send_from_directory, render_template, Response
+from flask import (
+    Flask,
+    request,
+    jsonify,
+    send_from_directory,
+    render_template,
+    Response,
+)
 import csv
+from common_utils.resource_path import get_data_path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "../res/db/plates.db")
+
 PORT = 5000
 
 app = Flask(
@@ -14,18 +22,23 @@ app = Flask(
 )
 
 
+def get_db_path():
+    return get_data_path("plates.db")
+
+
 def get_conn():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+    return sqlite3.connect(get_db_path(), check_same_thread=False)
 
 
 @app.route("/")
 def index():
-    return render_template("dashboard.html")
+    return render_template("static/dashboard.html")
 
 
-@app.route("/out/<path:filename>")
+@app.route("/plate_image/<path:filename>")
 def serve_out_files(filename):
-    return send_from_directory(os.path.join(BASE_DIR, "../out/"), filename)
+    base_dir = get_data_path("detected_plates_dir")
+    return send_from_directory(base_dir, filename)
 
 
 @app.route("/plates", methods=["GET"])
@@ -47,9 +60,7 @@ def list_plates():
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
 
-    query = (
-        "SELECT id, vehicle_id, image_path, plate_text, timestamp FROM plates WHERE 1=1"
-    )
+    query = "SELECT id, vehicle_id, plate_text, timestamp FROM plates WHERE 1=1"
     params = []
     if plate_text:
         query += " AND plate_text LIKE ?"
@@ -90,9 +101,8 @@ def list_plates():
                 {
                     "id": r[0],
                     "vehicle_id": r[1],
-                    "image_path": r[2] or "./static/plate_raw.jpg",
-                    "plate_text": r[3],
-                    "timestamp": r[4],
+                    "plate_text": r[2],
+                    "timestamp": r[3],
                 }
                 for r in rows
             ],
@@ -106,8 +116,8 @@ def create_plate():
     data = request.json
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO plates (vehicle_id, image_path, plate_text) VALUES (?, ?, ?)",
-            (data["vehicle_id"], data["image_path"], data["plate_text"]),
+            "INSERT INTO plates (vehicle_id, plate_text) VALUES (?, ?)",
+            (data["vehicle_id"], data["plate_text"]),
         )
         conn.commit()
     return jsonify({"status": "created"})
@@ -130,7 +140,9 @@ def delete_plate(pid):
     with get_conn() as conn:
         conn.execute("DELETE FROM plates WHERE id = ?", (pid,))
         conn.commit()
+        # TODO delete the image file from disk as well.
     return jsonify({"status": "deleted"})
+
 
 # export CSV
 @app.route("/plates/export", methods=["GET"])
@@ -139,7 +151,7 @@ def export_plates_csv():
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
 
-    query = "SELECT id, vehicle_id, image_path, plate_text, timestamp FROM plates WHERE 1=1"
+    query = "SELECT id, vehicle_id, plate_text, timestamp FROM plates WHERE 1=1"
     params = []
     if plate_text:
         query += " AND plate_text LIKE ?"
@@ -159,7 +171,7 @@ def export_plates_csv():
 
     si = StringIO()
     writer = csv.writer(si)
-    writer.writerow(["id", "vehicle_id", "image_path", "plate_text", "timestamp"])
+    writer.writerow(["id", "vehicle_id", "plate_text", "timestamp"])
     for r in rows:
         writer.writerow(r)
 
@@ -172,19 +184,19 @@ def export_plates_csv():
 
 
 def run_app():
-    app.run(port=PORT, debug=True, use_reloader=True)
+    app.run(port=PORT, debug=False, use_reloader=False)
 
 
 if __name__ == "__main__":
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    if not os.path.exists(DB_PATH):
-        with sqlite3.connect(DB_PATH) as conn:
+    db_path = get_db_path()
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    if not os.path.exists(db_path):
+        with sqlite3.connect(db_path) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS plates (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     vehicle_id TEXT,
-                    image_path TEXT,
                     plate_text TEXT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )

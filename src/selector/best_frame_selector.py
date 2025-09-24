@@ -6,7 +6,9 @@ from src.segmentation.segmentation import PlateSegmention
 from src.preprocessor.preprocessor import PlatePreprocessor
 from concurrent.futures import ThreadPoolExecutor
 from src.db.sqlite import DB
+from src.common_utils.app_logger import get_logger, log_duration
 
+logger = get_logger("best_frame_selector", logfile="logs/app2.jsonl")
 
 class OnlineBestFrameSelector:
     def __init__(
@@ -66,13 +68,13 @@ class OnlineBestFrameSelector:
 
     def finalize(self, vid):
         """Select the best frame (Save to disk for debugging)."""
-        file_name = f"Vehicle_{vid}_plate.jpg"
-        file_path = os.path.join(self.output_dir, file_name)
+        image_name = f"Vehicle_{vid}_plate.jpg"
+        image_name = os.path.join(self.output_dir, image_name)
         if vid in self.best_frames:
-            cv2.imwrite(file_path, self.best_frames[vid])
+            cv2.imwrite(image_name, self.best_frames[vid])
             # print(f"[Vehicle {vid}] ✅ Finalized and saved best plate")
         else:
-            print(f"[Vehicle {vid}] ⚠️ No plate detected, operator input needed")
+            logger.debug(f"[Vehicle {vid}] ⚠️ No plate detected, operator input needed")
 
         # Cleanup
         self.best_frames.pop(vid, None)
@@ -82,10 +84,10 @@ class OnlineBestFrameSelector:
 
         # downstream processing: use full path for processors
         preprocessor = PlatePreprocessor()
-        preprocessor.preprocess(file_name)
+        preprocessor.preprocess(image_name)
 
         segmentation = PlateSegmention()
-        glyphs = segmentation.segment(file_name)
+        glyphs = segmentation.segment(image_name)
 
         # Classify
         if glyphs is None:
@@ -113,12 +115,12 @@ class OnlineBestFrameSelector:
         # persist result to sqlite DB in the output directory
         plate_text = "".join(final_plate_text)
 
-        db = DB()
         try:
-            db.insert_plate(vid, file_path, plate_text)
+            db = DB()
+            logger.info(f"db.insert_plate({vid}, {plate_text})")
+            db.insert_plate(vid, plate_text)
         except Exception as e:
-            #TODO log error
-            print(f"[Vehicle {vid}] [Plate {plate_text}] ⚠️ Failed to write to DB: {e}")
+            logger.error(f"[Vehicle {vid}] [Plate {plate_text}] ⚠️ Failed to write to DB: {e}")
         finally:
             db.stop()
 

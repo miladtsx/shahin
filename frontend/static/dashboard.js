@@ -49,11 +49,9 @@ async function fetchPlates(query = "") {
     // vidTd.textContent = p.vehicle_id;
     // tr.appendChild(vidTd);
 
-    // Image cell
     const imgTd = document.createElement("td");
-    imgTd.innerHTML = `<img src="../../${
-      p.image_path
-    }" onclick='openPlateImageModal("${p.image_path}", ${JSON.stringify(
+    const image_path = `/plate_image/Vehicle_${p.id}_plate.jpg`;
+    imgTd.innerHTML = `<img src="${image_path}" onclick='openPlateImageModal("${image_path}", ${JSON.stringify(
       p
     ).replace(/"/g, "&quot;")})'>`;
     tr.appendChild(imgTd);
@@ -197,7 +195,6 @@ async function addPlate() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       vehicle_id: 0,
-      image_path: "",
       plate_text: plate,
     }),
   });
@@ -287,7 +284,6 @@ async function submitAddPlate() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         vehicle_id: 0,
-        image_path: "",
         plate_text: plate,
       }),
     });

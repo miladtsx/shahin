@@ -18,6 +18,16 @@ Select the sharpest, best-quality frame of each unique license plate from a 120 
 
 ## Setup
 
+### Windows
+```sh
+ py -m venv .venv
+ .\.venv\Scripts\Activate.ps1  
+c:\users\user\desktop\shahin-dev\.venv\scripts\python.exe -m pip install --upgrade pip
+pip install -r .\requirements.txt
+```
+
+
+### Linux
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate

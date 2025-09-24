@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from typing import Tuple
 from src.common_utils.config import Config
+from src.common_utils.resource_path import get_data_path
 
 
 class PlatePreprocessor:
@@ -13,8 +14,8 @@ class PlatePreprocessor:
     ):
         conf = Config().config
 
-        self.input_dir = conf.get("detected_plates_dir")
-        self.output_dir = conf.get("preprocessed_plates_dir")
+        self.input_dir = get_data_path("detected_plates_dir")
+        self.output_dir = get_data_path("preprocessed_plates_dir")
         self.resize_dim = resize_dim
         self.min_char_area = min_char_area
         os.makedirs(self.output_dir, exist_ok=True)

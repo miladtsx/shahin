@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from typing import List, Tuple
 from src.common_utils.config import Config
+from src.common_utils.resource_path import get_data_path
 
 
 class PlateSegmention:
@@ -10,8 +11,8 @@ class PlateSegmention:
         self,
     ):
         conf = Config().config
-        self.input_dir = conf.get("preprocessed_plates_dir")
-        self.output_dir = conf.get("segmentation_output_dir")
+        self.input_dir = get_data_path("preprocessed_plates_dir")
+        self.output_dir = get_data_path("segmentation_output_dir")
 
     def _save_debug(self, image, filename, tag):
         os.makedirs(f"debug/segmentation/{filename}", exist_ok=True)

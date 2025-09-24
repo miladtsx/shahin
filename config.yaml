@@ -1,8 +1,5 @@
 video_path: rtsp://127.0.0.1:8554/live.stream
 db_path: "./res/db/plates.db"
-detected_plates_dir: ./out/detected_plates/
-preprocessed_plates_dir: ./out/preprocessed_plates/
-segmentation_output_dir: ./out/segmentation/
 frame_skip: 15
 vehicle_classes:
   - 2 #car
@@ -11,8 +8,6 @@ vehicle_classes:
   - 7 #truck
 plate_classes:
   - license_plate
-model_plate: ./res/models/license_plate_detector.pt
-model_vehicle: ./res/models/vehicle_detector_yolov11n.pt
 car_detection_threshold: 0.6
 plate_detection_threshold: 0.5
 crop_dimension_threshold: 2400
