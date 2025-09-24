@@ -1,5 +1,6 @@
 from ultralytics import YOLO
 import cv2
+import numpy as np
 
 class VehicleDetector:
     def __init__(self, model_path, allowed_classes):
@@ -9,12 +10,23 @@ class VehicleDetector:
 
     def detect(self, frame, conf_threshold=0.5):
         results = self.model(frame, verbose=False)[0]
-        detections_ = []
-        for detection in results.boxes.data.tolist():
-            x1, y1, x2, y2, score, class_id = detection
-            if int(class_id) in self.allowed:
-                detections_.append([x1, y1, x2, y2, score])
-        return detections_
+        boxes_data = results.boxes.data.cpu().numpy()  # x1,y1,x2,y2,score,class_id
+        
+        if boxes_data.size == 0:
+            return np.empty((0, 5), dtype=np.float64)
+
+        # Ensure class IDs are ints for filtering
+        scores = boxes_data[:, 4]
+        class_ids = boxes_data[:, 5].astype(int)
+
+        # Mask: allowed classes AND confidence threshold
+        allowed_set = set(self.allowed)
+        mask = (scores >= conf_threshold) & np.array([cid in allowed_set for cid in class_ids])
+        
+        filtered = boxes_data[mask, :5].astype(np.float64)  # x1,y1,x2,y2,score
+        return filtered if filtered.shape[0] > 0 else np.empty((0, 5), dtype=np.float64)
+
+
 
     def draw(self, frame, tracked_boxes):
         for det in tracked_boxes:
