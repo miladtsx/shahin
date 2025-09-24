@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Plate Tracking with YOLO - Portfolio</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Car Plate Tracker</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="#home" data-i18n="nav.home">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#about" data-i18n="nav.about">About</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#demo" data-i18n="nav.demo">Demo</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#tech" data-i18n="nav.tech">Technologies</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="https://github.com/your-github-username/shahin" target="_blank" data-i18n="nav.github">GitHub</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" data-i18n="nav.language">
+                            Language
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item" href="#" data-lang="en">🇬🇧 English</a></li>
+                            <li><a class="dropdown-item" href="#" data-lang="fa">🇮🇷 فارسی</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <header id="home" class="hero-section text-center text-white d-flex align-items-center justify-content-center">
+        <div class="container">
+            <h1 class="display-3" data-i18n="hero.title">Advanced Car Plate Tracking System</h1>
+            <p class="lead" data-i18n="hero.subtitle">Leveraging YOLO models for real-time vehicle and license plate detection and recognition.</p>
+            <a href="#about" class="btn btn-primary btn-lg mt-3" data-i18n="hero.learn_more">Learn More</a>
+        </div>
+    </header>
+
+    <section id="about" class="py-5">
+        <div class="container">
+            <h2 class="text-center mb-4" data-i18n="about.title">About the Project</h2>
+            <div class="row">
+                <div class="col-md-8 mx-auto">
+                    <p data-i18n="about.paragraph1">This project is a robust car plate tracking system designed to accurately detect vehicles and their license plates in various scenarios. It utilizes state-of-the-art YOLO (You Only Look Once) models for efficient object detection, followed by character recognition for the extracted license plates.</p>
+                    <p data-i18n="about.paragraph2">Key features include:</p>
+                    <ul>
+                        <li data-i18n="about.feature1"><strong>Vehicle Detection:</strong> Identifies cars, trucks, and other vehicles in video streams or images.</li>
+                        <li data-i18n="about.feature2"><strong>License Plate Detection:</strong> Precisely locates license plates on detected vehicles.</li>
+                        <li data-i18n="about.feature3"><strong>Character Recognition:</strong> Extracts and recognizes characters from the license plates using a custom-trained classifier.</li>
+                        <li data-i18n="about.feature4"><strong>Tracking:</strong> Implements object tracking to follow vehicles and their plates across multiple frames.</li>
+                        <li data-i18n="about.feature5"><strong>Database Integration:</strong> Stores detected plate information for further analysis.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="demo" class="bg-light py-5">
+        <div class="container">
+            <h2 class="text-center mb-4" data-i18n="demo.title">Live Demo & Screenshots</h2>
+            <p class="text-center mb-5" data-i18n="demo.subtitle">See the system in action with these examples of vehicle and plate detection.</p>
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm">
+                        <img src="images/plate_detection.jpg" class="card-img-top" alt="License Plate Detection">
+                        <div class="card-body">
+                            <h5 class="card-title" data-i18n="demo.card1_title">License Plate Detection</h5>
+                            <p class="card-text" data-i18n="demo.card1_text">Example of a detected vehicle and its license plate highlighted by the system.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm">
+                        <img src="images/character_recognition.jpg" class="card-img-top" alt="Character Recognition">
+                        <div class="card-body">
+                            <h5 class="card-title" data-i18n="demo.card2_title">Character Recognition</h5>
+                            <p class="card-text" data-i18n="demo.card2_text">Close-up of a license plate with individual characters recognized by the classifier.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Add more demo content or a video embed here if available -->
+        </div>
+    </section>
+
+    <section id="tech" class="py-5">
+        <div class="container">
+            <h2 class="text-center mb-4" data-i18n="tech.title">Technologies Used</h2>
+            <div class="row">
+                <div class="col-md-8 mx-auto">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item" data-i18n="tech.yolo"><strong>YOLO (You Only Look Once):</strong> For real-time object detection (vehicles and license plates).</li>
+                        <li class="list-group-item" data-i18n="tech.python"><strong>Python:</strong> Primary programming language for backend logic and model inference.</li>
+                        <li class="list-group-item" data-i18n="tech.opencv"><strong>OpenCV:</strong> For image and video processing tasks.</li>
+                        <li class="list-group-item" data-i18n="tech.pytorch_tf"><strong>PyTorch/TensorFlow:</strong> For training and deploying deep learning models.</li>
+                        <li class="list-group-item" data-i18n="tech.sqlite"><strong>SQLite:</strong> For local database storage of tracking data.</li>
+                        <li class="list-group-item" data-i18n="tech.frontend"><strong>Streamlit/Flask (Frontend):</strong> For building interactive web interfaces (if applicable).</li>
+                        <li class="list_group-item" data-i18n="tech.docker"><strong>Docker:</strong> For containerization and deployment.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-dark text-white text-center py-4">
+        <div class="container">
+            <p data-i18n="footer.copyright">&copy; 2025 Your Name. All rights reserved.</p>
+            <p data-i18n="footer.repo_text">Project Repository: <a href="https://github.com/your-github-username/shahin" target="_blank" class="text-white" data-i18n="footer.repo_link">GitHub Link</a></p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="script.js"></script>
+</body>
+</html>

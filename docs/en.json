@@ -1,0 +1,48 @@
+{
+    "nav": {
+        "home": "Home",
+        "about": "About",
+        "demo": "Demo",
+        "tech": "Technologies",
+        "github": "GitHub",
+        "language": "Language"
+    },
+    "hero": {
+        "title": "Advanced Car Plate Tracking System",
+        "subtitle": "Leveraging YOLO models for real-time vehicle and license plate detection and recognition.",
+        "learn_more": "Learn More"
+    },
+    "about": {
+        "title": "About the Project",
+        "paragraph1": "This project is a robust car plate tracking system designed to accurately detect vehicles and their license plates in various scenarios. It utilizes state-of-the-art YOLO (You Only Look Once) models for efficient object detection, followed by character recognition for the extracted license plates.",
+        "paragraph2": "Key features include:",
+        "feature1": "<strong>Vehicle Detection:</strong> Identifies cars, trucks, and other vehicles in video streams or images.",
+        "feature2": "<strong>License Plate Detection:</strong> Precisely locates license plates on detected vehicles.",
+        "feature3": "<strong>Character Recognition:</strong> Extracts and recognizes characters from the license plates using a custom-trained classifier.",
+        "feature4": "<strong>Tracking:</strong> Implements object tracking to follow vehicles and their plates across multiple frames.",
+        "feature5": "<strong>Database Integration:</strong> Stores detected plate information for further analysis."
+    },
+    "demo": {
+        "title": "Live Demo & Screenshots",
+        "subtitle": "See the system in action with these examples of vehicle and plate detection.",
+        "card1_title": "License Plate Detection",
+        "card1_text": "Example of a detected vehicle and its license plate highlighted by the system.",
+        "card2_title": "Character Recognition",
+        "card2_text": "Close-up of a license plate with individual characters recognized by the classifier."
+    },
+    "tech": {
+        "title": "Technologies Used",
+        "yolo": "<strong>YOLO (You Only Look Once):</strong> For real-time object detection (vehicles and license plates).",
+        "python": "<strong>Python:</strong> Primary programming language for backend logic and model inference.",
+        "opencv": "<strong>OpenCV:</strong> For image and video processing tasks.",
+        "pytorch_tf": "<strong>PyTorch/TensorFlow:</strong> For training and deploying deep learning models.",
+        "sqlite": "<strong>SQLite:</strong> For local database storage of tracking data.",
+        "frontend": "<strong>Streamlit/Flask (Frontend):</strong> For building interactive web interfaces (if applicable).",
+        "docker": "<strong>Docker:</strong> For containerization and deployment."
+    },
+    "footer": {
+        "copyright": "&copy; 2025 Your Name. All rights reserved.",
+        "repo_text": "Project Repository:",
+        "repo_link": "GitHub Link"
+    }
+}
