@@ -4,19 +4,16 @@ import numpy as np
 from typing import List, Tuple
 from src.common_utils.config import Config
 from src.common_utils.resource_path import get_data_path
+from src.common_utils.image_save import save
 
 
-class PlateSegmention:
+class PlateSegmentation:
     def __init__(
         self,
     ):
         conf = Config().config
         self.input_dir = get_data_path("preprocessed_plates_dir")
         self.output_dir = get_data_path("segmentation_output_dir")
-
-    def _save_debug(self, image, filename, tag):
-        os.makedirs(f"debug/segmentation/{filename}", exist_ok=True)
-        cv2.imwrite(f"debug/segmentation/{filename}/{tag}.jpg", image)
 
     def _resize_and_pad(
         self, image: np.ndarray, size: Tuple[int, int] = (32, 32)
@@ -83,14 +80,12 @@ class PlateSegmention:
 
         return merged
 
-    def _segment_glyphs(self, image_path: str) -> List[np.ndarray]:
-        """Returns list of 8 cropped glyph images."""
-        image = cv2.imread(image_path)
-        filename = os.path.splitext(os.path.basename(image_path))[0]
-
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # type: ignore
+    def _segment_glyphs(self, image: np.ndarray) -> List[np.ndarray]:
+        """Returns list of 8 cropped glyph images from a preprocessed plate image."""
+        gray = (
+            cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+        )
         _, thresh = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY_INV)
-
         contours, _ = cv2.findContours(
             thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
@@ -112,18 +107,12 @@ class PlateSegmention:
         merged_boxes = self._merge_dots_into_glyphs(raw_boxes)
         boxes = sorted(merged_boxes, key=lambda b: b[0])
 
-        debug_img = image.copy()  # type: ignore
-        for x, y, w, h in boxes:
-            cv2.rectangle(debug_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
-        self._save_debug(debug_img, filename, "merged_boxes")
-
         glyphs = []
         for idx, (x, y, w, h) in enumerate(boxes):
             crop = thresh[y : y + h, x : x + w]
             # Invert before saving the glyph
             glyph = 255 - self._resize_and_pad(crop, (32, 32))
             glyphs.append(glyph)
-            self._save_debug(glyph, filename, f"glyph_{idx}")
 
         # Normalize to 8
         if len(glyphs) > 8:
@@ -133,41 +122,15 @@ class PlateSegmention:
 
         return glyphs
 
-    def segment(self, file_name):
-        """Segment all images in the output directory."""
-        os.makedirs(self.output_dir, exist_ok=True)
-
-        if not file_name.lower().endswith((".jpg", ".jpeg", ".png")):
-            return
-
-        image_path = os.path.join(self.input_dir, file_name)
-        glyphs = self._segment_glyphs(image_path)
+    def segment(self, image: np.ndarray, vid):
+        """
+        Accepts a preprocessed plate image (np.ndarray), returns list of (idx, glyph) tuples.
+        """
+        glyphs = self._segment_glyphs(image)
 
         results = []
-        dir_path = os.path.join(self.output_dir, f"{os.path.splitext(file_name)[0]}")
-        os.makedirs(dir_path, exist_ok=True)
         for idx, glyph in enumerate(glyphs):
-            output_path = os.path.join(dir_path, f"_glyph_{idx}.png")
-            cv2.imwrite(output_path, glyph)
+            save(glyph, vid, f"_g_{idx}")
             results.append((idx, glyph))
 
         return results
-
-    def segment_bulk(self):
-        """Segment all images in the output directory."""
-        os.makedirs(self.output_dir, exist_ok=True)
-
-        for filename in os.listdir(self.input_dir):
-            if not filename.lower().endswith((".jpg", ".jpeg", ".png")):
-                continue
-
-            image_path = os.path.join(self.input_dir, filename)
-            glyphs = self._segment_glyphs(image_path)
-
-            for idx, glyph in enumerate(glyphs):
-                dir_path = os.path.join(
-                    self.output_dir, f"{os.path.splitext(filename)[0]}"
-                )
-                os.makedirs(dir_path, exist_ok=True)
-                output_path = os.path.join(dir_path, f"_glyph_{idx}.png")
-                cv2.imwrite(output_path, glyph)

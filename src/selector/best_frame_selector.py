@@ -1,12 +1,11 @@
 from collections import defaultdict
 import os
-import cv2
 from src.classify.classify import GlyphClassifier
-from src.segmentation.segmentation import PlateSegmention
+from src.segmentation.segmentation import PlateSegmentation
 from src.preprocessor.preprocessor import PlatePreprocessor
-from concurrent.futures import ThreadPoolExecutor
 from src.db.sqlite import DB
-from src.common_utils.app_logger import get_logger, log_duration
+from src.common_utils.app_logger import get_logger
+from src.common_utils.image_save import save
 
 logger = get_logger("best_frame_selector", logfile="logs/app2.jsonl")
 
@@ -70,28 +69,19 @@ class OnlineBestFrameSelector:
     def finalize(self, vid):
         """Select the best frame (Save to disk for debugging)."""
         try:
-            image_name = f"Vehicle_{vid}_plate.jpg"
-            image_name = os.path.join(self.output_dir, image_name)
-            if vid in self.best_frames:
-                cv2.imwrite(image_name, self.best_frames[vid])
-                # print(f"[Vehicle {vid}] ✅ Finalized and saved best plate")
+            if vid in self.best_frames:  ## TODO why looping here?
+                save(self.best_frames[vid], vid, "best")
             else:
                 logger.debug(
                     f"[Vehicle {vid}] ⚠️ No plate detected, operator input needed"
                 )
 
-            # Cleanup
-            self.best_frames.pop(vid, None)
-            self.best_scores.pop(vid, None)
-            self.last_update.pop(vid, None)
-            self.missed_frames.pop(vid, None)
-
             # downstream processing: use full path for processors
             preprocessor = PlatePreprocessor()
-            preprocessor.preprocess(image_name)
+            preprocessor.preprocess(self.best_frames[vid])
 
-            segmentation = PlateSegmention()
-            glyphs = segmentation.segment(image_name)
+            segmentation = PlateSegmentation()
+            glyphs = segmentation.segment(self.best_frames[vid], vid)
 
             # Classify
             if glyphs is None:
@@ -135,9 +125,18 @@ class OnlineBestFrameSelector:
             finally:
                 db.stop()
 
+            self.cleanup(vid)
+
             return final_plate_text
         except Exception as e:
             logger.error(f"[Vehicle {vid}] ⚠️ Failed to finalize track: {e}")
+
+    def cleanup(self, vid):
+        # Cleanup
+        self.best_frames.pop(vid, None)
+        self.best_scores.pop(vid, None)
+        self.last_update.pop(vid, None)
+        self.missed_frames.pop(vid, None)
 
 
 def to_farsi_number(s):

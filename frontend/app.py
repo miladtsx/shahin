@@ -35,10 +35,13 @@ def index():
     return render_template("static/dashboard.html")
 
 
-@app.route("/plate_image/<path:filename>")
-def serve_out_files(filename):
-    base_dir = get_data_path("detected_plates_dir")
-    return send_from_directory(base_dir, filename)
+@app.route("/plate_image/<int:vid>/<string:tag>")
+def serve_out_files(vid, tag):
+    """
+    Generic api to help the dashboard load images from disk
+    """
+    base_dir = get_data_path(f"out/{vid}")
+    return send_from_directory(base_dir, f"{tag}.jpg")
 
 
 @app.route("/plates", methods=["GET"])

@@ -50,8 +50,8 @@ async function fetchPlates(query = "") {
     // tr.appendChild(vidTd);
 
     const imgTd = document.createElement("td");
-    const image_path = `/plate_image/Vehicle_${p.vehicle_id}_plate.jpg`;
-    imgTd.innerHTML = `<img src="${image_path}" onclick='openPlateImageModal("${image_path}", ${JSON.stringify(
+    imgTd.innerHTML = `<img src="/plate_image/${p.vehicle_id}/best" 
+    onclick='openPlateImageModal("/plate_image/${p.vehicle_id}/original", ${JSON.stringify(
       p
     ).replace(/"/g, "&quot;")})'>`;
     tr.appendChild(imgTd);

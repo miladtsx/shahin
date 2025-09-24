@@ -1,4 +1,3 @@
-import numpy as np
 from src.detectors.vehicle_detector import VehicleDetector
 from src.detectors.plate_detector import PlateDetector
 from src.selector.best_frame_selector import OnlineBestFrameSelector
@@ -8,6 +7,8 @@ from src.common_utils.video_loader import VideoLoader
 from src.common_utils.config import Config
 from src.common_utils.app_logger import get_logger, log_duration
 from concurrent.futures import ThreadPoolExecutor
+from src.common_utils.resource_path import get_resource_path, get_data_path
+from src.common_utils.image_save import save
 
 logger = get_logger("detect", logfile="logs/app.jsonl")
 
@@ -15,136 +16,114 @@ logger = get_logger("detect", logfile="logs/app.jsonl")
 def run_plate_detection():
     conf = Config().config
 
-    output_dir = conf.get("detected_plates_dir")
-    logger.info(
-        "run_plate_detection_start", extra={"event": "run_plate_detection_start"}
-    )
+    output_dir = get_data_path("detected_plates_dir")
+    # logger.info(
+    #     "run_plate_detection_start", extra={"event": "run_plate_detection_start"}
+    # )
 
     # Init
     with log_duration(logger, "init_components"):
         loader = VideoLoader(conf.get("video_path"))
         detector_vehicle = VehicleDetector(
-            conf.get("model_vehicle"), conf.get("vehicle_classes")
+            get_resource_path("res/models/vehicle_detector_yolov11n.pt"),
+            [
+                2,  # car
+                3,  # motorcycle
+                5,  # bus
+                7,  # truck
+            ],
         )
         detector_plate = PlateDetector(
-            conf.get("model_plate"), conf.get("plate_classes")
+            get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
         )
         tracker = Sort()
         selector = OnlineBestFrameSelector(score_quality, output_dir)
+        executor = ThreadPoolExecutor(max_workers=4)
 
     frame_count = 0
-    for frame in loader:
-        if frame_count % conf.get("frame_skip", 1) != 0:
+    try:
+        for frame in loader:
             frame_count += 1
-            continue
+            if frame_count % conf.get("frame_skip", 1) != 0:
+                continue
 
-        # 1. Detect & Track Vehicles
-        with log_duration(logger, "detect_vehicles", frame=frame_count):
+            # 1. Detect vehicles
+            # with log_duration(logger, "detect_vehicles", frame=frame_count):
             vehicles = detector_vehicle.detect(
                 frame, conf_threshold=conf["car_detection_threshold"]
             )
-        if not vehicles or not len(vehicles):
-            continue
-
-        # Track vehicles
-        # Convert to numpy array for SORT tracker
-        # Each vehicle is represented as [x1, y1, x2, y2, score]
-        # where (x1, y1) is the top-left corner and (x2, y2) is the bottom-right corner
-        # score is the confidence score of the detection
-        dets_np = np.array(vehicles, dtype=np.float64).reshape(-1, 5)
-        tracked = tracker.update(dets_np)
-
-        # Convert to dict format
-        tracked_dicts = []
-        for trk in tracked:
-            x1, y1, x2, y2, track_id = map(int, trk)
-            tracked_dicts.append({"id": track_id, "bbox": (x1, y1, x2, y2)})
-
-        active_ids = set()
-        for vehicle in tracked_dicts:
-            vid = vehicle["id"]
-            active_ids.add(vid)
-            selector.mark_seen(vid)
-            x1, y1, x2, y2 = vehicle["bbox"]
-            vh_crop = frame[y1:y2, x1:x2]
-
-            # 2. Detect Plate inside Vehicle Crop
-            plates = []
-            try:
-                plates = detector_plate.detect(
-                    vh_crop, conf_threshold=conf.get("plate_detection_threshold")
-                )
-            except Exception as e:
-                logger.exception(
-                    "plate_detection_error",
-                    extra={"vehicle_id": vid, "frame": frame_count},
-                )
-            if not plates:
+            if vehicles.size == 0:
                 continue
 
-            plate_crop = None
-            best_score = -1
-            best_crop = None
-            for plate in plates:
-                px1, py1, px2, py2 = plate["bbox"]
-                pw, ph = px2 - px1, py2 - py1
+            # 2. Track vehicles
+            tracked = tracker.update(vehicles)
+            tracked_dicts = [
+                {"id": int(trk[4]), "bbox": tuple(map(int, trk[:4]))} for trk in tracked
+            ]
 
-                px1, py1, px2, py2 = shrink_box(px1, py1, px2, py2)
-                plate_crop = vh_crop[py1:py2, px1:px2]
-                if plate_crop.size == 0:
-                    continue  # Avoid passing empty arrays to imshow
+            active_ids = set()
+            vehicle_crops = []
+            vehicle_ids = []
 
-                if pw * ph < int(conf.get("crop_dimension_threshold", 0)):
-                    continue  # skip tiny plates
+            # 3. Prepare crops
+            for trk in tracked_dicts:
+                vid = trk["id"]
+                active_ids.add(vid)
+                selector.mark_seen(vid)
+                x1, y1, x2, y2 = trk["bbox"]
+                crop = frame[y1:y2, x1:x2]
+                if crop.size > 0:
+                    vehicle_crops.append(crop)
+                    vehicle_ids.append(vid)
 
-                # Sanity check plate aspect ratio:
-                aspect_ratio = pw / ph
-                if aspect_ratio < 1.5 or aspect_ratio > 6.0:
+            # 4. Batch plate detection
+            plates_batch = detector_plate.detect_batch(
+                vehicle_crops, conf_threshold=conf.get("plate_detection_threshold")
+            )
+
+            # 5. Process detected plates
+            for vid, plates, vh_crop in zip(vehicle_ids, plates_batch, vehicle_crops):
+                if not plates:
                     continue
+                best_crop = None
+                best_score = -1
 
-                if plate_crop.size == 0:
-                    continue
+                for plate in plates:
+                    px1, py1, px2, py2 = shrink_box(*plate["bbox"])
 
-                score = score_quality(plate_crop)
+                    save(vh_crop, vid, "pre")
+                    save(frame, vid, "original")
+                    plate_crop = vh_crop[py1:py2, px1:px2]
+                    if plate_crop.size == 0:
+                        continue
 
-                logger.info(
-                    "plate_detected",
-                    extra={
-                        "vid": vid,
-                        "frame": frame_count,
-                        "plate_crop_size": plate_crop.shape[:2],
-                        "score": score,
-                    },
-                )
+                    pw, ph = px2 - px1, py2 - py1
+                    if pw * ph < int(conf.get("crop_dimension_threshold", 0)):
+                        continue
+                    aspect_ratio = pw / ph
+                    if aspect_ratio < 1.5 or aspect_ratio > 6.0:
+                        continue
 
-                if score > best_score:
-                    best_score = score
-                    best_crop = plate_crop
+                    score = score_quality(plate_crop)
+                    if score > best_score:
+                        best_score = score
+                        best_crop = plate_crop
 
-            if best_crop is not None:
-                score, improved = selector.update(vid, best_crop, frame_count)
-                if improved:
-                    logger.info(
-                        "plate_improved",
-                        extra={
-                            "vid": vid,
-                            "frame": frame_count,
-                            "score": best_score,
-                        },
-                    )
+                if best_crop is not None:
+                    score, improved = selector.update(vid, best_crop, frame_count)
 
-            # check which tracks to finalize this frame
+            # 6. Finalize tracks once per frame
             to_finalize = selector.step_end(active_ids, frame_count)
             for vid in to_finalize:
-                with ThreadPoolExecutor() as executer:
-                    executer.submit(selector.finalize, vid)
-
-            frame_count += 1
-
+                executor.submit(selector.finalize, vid)
+    except Exception as e:
+        logger.exception(f"run_plate_detection_failed: {e}")
+    finally:
         logger.info(
             "run_plate_detection_finished",
             extra={"event": "run_plate_detection_finished"},
         )
+        executor.shutdown(wait=True)
 
 
 # Shrink box by a fixed margin percentage
