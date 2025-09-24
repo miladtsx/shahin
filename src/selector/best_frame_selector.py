@@ -3,7 +3,6 @@ import os
 from src.classify.classify import GlyphClassifier
 from src.segmentation.segmentation import PlateSegmentation
 from src.preprocessor.preprocessor import PlatePreprocessor
-from src.db.sqlite import DB
 from src.common_utils.app_logger import get_logger
 from src.common_utils.image_save import save
 
@@ -66,7 +65,7 @@ class OnlineBestFrameSelector:
 
         return finalized
 
-    def finalize(self, vid):
+    def finalize(self, db, vid):
         """Select the best frame (Save to disk for debugging)."""
         try:
             if vid in self.best_frames:  ## TODO why looping here?
@@ -115,7 +114,6 @@ class OnlineBestFrameSelector:
 
             plate_text = "".join(final_plate_text)
 
-            db = DB()
             try:
                 db.insert_plate(vid, plate_text)
             except Exception as e:
@@ -123,9 +121,7 @@ class OnlineBestFrameSelector:
                     f"[Vehicle {vid}] [Plate {plate_text}] ⚠️ Failed to write to DB: {e}"
                 )
             finally:
-                db.stop()
-
-            self.cleanup(vid)
+                self.cleanup(vid)
 
             return final_plate_text
         except Exception as e:

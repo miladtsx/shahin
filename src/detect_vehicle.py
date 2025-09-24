@@ -1,3 +1,4 @@
+from src.db.sqlite import DB
 from src.detectors.vehicle_detector import VehicleDetector
 from src.detectors.plate_detector import PlateDetector
 from src.selector.best_frame_selector import OnlineBestFrameSelector
@@ -15,6 +16,7 @@ logger = get_logger("detect", logfile="logs/app.jsonl")
 
 def run_plate_detection():
     conf = Config().config
+    db = DB()
 
     output_dir = get_data_path("detected_plates_dir")
     # logger.info(
@@ -42,6 +44,7 @@ def run_plate_detection():
 
     frame_count = 0
     try:
+        original_frame = None
         for frame in loader:
             frame_count += 1
             if frame_count % conf.get("frame_skip", 1) != 0:
@@ -72,6 +75,7 @@ def run_plate_detection():
                 selector.mark_seen(vid)
                 x1, y1, x2, y2 = trk["bbox"]
                 crop = frame[y1:y2, x1:x2]
+                original_frame = frame
                 if crop.size > 0:
                     vehicle_crops.append(crop)
                     vehicle_ids.append(vid)
@@ -91,8 +95,6 @@ def run_plate_detection():
                 for plate in plates:
                     px1, py1, px2, py2 = shrink_box(*plate["bbox"])
 
-                    save(vh_crop, vid, "pre")
-                    save(frame, vid, "original")
                     plate_crop = vh_crop[py1:py2, px1:px2]
                     if plate_crop.size == 0:
                         continue
@@ -115,7 +117,8 @@ def run_plate_detection():
             # 6. Finalize tracks once per frame
             to_finalize = selector.step_end(active_ids, frame_count)
             for vid in to_finalize:
-                executor.submit(selector.finalize, vid)
+                save(original_frame, vid, "original")
+                executor.submit(selector.finalize, db, vid)
     except Exception as e:
         logger.exception(f"run_plate_detection_failed: {e}")
     finally:
@@ -124,6 +127,7 @@ def run_plate_detection():
             extra={"event": "run_plate_detection_finished"},
         )
         executor.shutdown(wait=True)
+        db.close()
 
 
 # Shrink box by a fixed margin percentage
