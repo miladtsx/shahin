@@ -19,23 +19,22 @@ def run_plate_detection():
     db = DB()
 
     # Init
-    with log_duration(logger, "init_components"):
-        loader = VideoLoader(conf.get("video_path"))
-        detector_vehicle = VehicleDetector(
-            get_resource_path("res/models/vehicle_detector_yolov11n.pt"),
-            [
-                2,  # car
-                3,  # motorcycle
-                5,  # bus
-                7,  # truck
-            ],
-        )
-        detector_plate = PlateDetector(
-            get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
-        )
-        tracker = Sort()
-        selector = OnlineBestFrameSelector(score_quality)
-        executor = ThreadPoolExecutor(max_workers=4)
+    loader = VideoLoader(conf.get("video_path"))
+    detector_vehicle = VehicleDetector(
+        get_resource_path("res/models/vehicle_detector_yolov11n.pt"),
+        [
+            2,  # car
+            3,  # motorcycle
+            5,  # bus
+            7,  # truck
+        ],
+    )
+    detector_plate = PlateDetector(
+        get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
+    )
+    tracker = Sort()
+    selector = OnlineBestFrameSelector(score_quality)
+    executor = ThreadPoolExecutor(max_workers=4)
 
     frame_count = 0
     try:
@@ -52,6 +51,8 @@ def run_plate_detection():
             )
             if vehicles.size == 0:
                 continue
+
+            print("Vehicle Found")
 
             # 2. Track vehicles
             tracked = tracker.update(vehicles)
@@ -79,6 +80,9 @@ def run_plate_detection():
             plates_batch = detector_plate.detect_batch(
                 vehicle_crops, conf_threshold=conf.get("plate_detection_threshold")
             )
+
+            print("Detected Plates:", plates_batch)
+
 
             # 5. Process detected plates
             for vid, plates, vh_crop in zip(vehicle_ids, plates_batch, vehicle_crops):
@@ -111,6 +115,7 @@ def run_plate_detection():
 
             # 6. Finalize tracks once per frame
             to_finalize = selector.step_end(active_ids, frame_count)
+            print("Finalizing tracks:", to_finalize)
             for vid in to_finalize:
                 save(original_frame, vid, "original")
                 executor.submit(selector.finalize, db, vid)

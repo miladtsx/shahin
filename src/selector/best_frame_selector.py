@@ -6,7 +6,7 @@ from src.preprocessor.preprocessor import PlatePreprocessor
 from src.common_utils.app_logger import get_logger
 from src.common_utils.image_save import save
 
-logger = get_logger("best_frame_selector", logfile="logs/app2.jsonl")
+logger = get_logger("best_frame_selector", logfile="logs/app.jsonl")
 
 
 class OnlineBestFrameSelector:
