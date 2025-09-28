@@ -1,6 +1,7 @@
 # config.py
-import yaml, os, sys
-from typing import TypedDict, List
+import yaml, os
+from typing import TypedDict
+from src.common_utils.resource_path import get_data_path
 
 
 class MyConfig(TypedDict):
@@ -13,7 +14,7 @@ class MyConfig(TypedDict):
 
 DEFAULT_CONFIG: MyConfig = {
     "video_path": "rtsp://127.0.0.1:8554/live.stream",
-    "frame_skip": 24,
+    "frame_skip": 1,
     "car_detection_threshold": 0.6,
     "plate_detection_threshold": 0.5,
     "crop_dimension_threshold": 2400,
@@ -28,8 +29,7 @@ class Config:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
 
-            base_path = os.path.dirname(sys.executable)
-            config_path = os.path.join(base_path, path)
+            config_path = get_data_path("config.yaml")
 
             # Create a default conf file if does not exists
             if not os.path.exists(config_path):
