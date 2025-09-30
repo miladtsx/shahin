@@ -14,39 +14,81 @@ class OnlineBestFrameSelector:
     def __init__(
         self,
         scorer,
-        no_improve_patience=10,  # frames without improvement
+        no_improve_patience=10,
         track_timeout=10,
         k=10,
-    ):  # frames after track disappears
+        improve_margin=0.1,  # relative margin to trigger re-OCR
+    ):
         self.scorer = scorer
         self.candidates = defaultdict(list)  # vid -> [(score, frame_idx, crop), ...]
-        self.best_frames = {}  # vid -> best_crop
-        self.best_scores = defaultdict(lambda: -1.0)
+        self.best_frames = {}  # vid -> (score, crop, frame_idx)
         self.last_update = {}  # vid -> last frame number
-        self.missed_frames = defaultdict(int)  # vid -> how many frames since last seen
+        self.missed_frames = defaultdict(int)
         self.k = k
-
         self.no_improve_patience = no_improve_patience
         self.track_timeout = track_timeout
+        self.improve_margin = improve_margin
+        self.ocr_results = {}  # vid -> latest OCR text
 
-    def update(self, vid, crop, frame_idx):
+    def update(self, vid, crop, frame_idx, db=None, executor=None):
         score = self.scorer(crop)
         heappush(self.candidates[vid], (score, frame_idx, crop))
         if len(self.candidates[vid]) > self.k:
-            heappop(self.candidates[vid])  # drop worst
+            heappop(self.candidates[vid])
         self.last_update[vid] = frame_idx
         self.missed_frames[vid] = 0
+
+        prev_best = self.best_frames.get(vid)
+        if prev_best is None or score > prev_best[0] * (1 + self.improve_margin):
+            # Found a significantly better frame -> trigger OCR now
+            self.best_frames[vid] = (score, crop, frame_idx)
+            if executor and db:
+                executor.submit(self._run_ocr, db, vid, crop)
+
         return score
+
+    def _run_ocr(self, db, vid, crop):
+        """Run OCR immediately on the current best crop and overwrite previous result."""
+        try:
+            save(crop, vid, "best_live")
+
+            preprocessor = PlatePreprocessor()
+            preprocessor.preprocess(crop)
+
+            segmentation = PlateSegmentation()
+            glyphs = segmentation.segment(crop, vid)
+            if glyphs is None:
+                return
+
+            classifier = GlyphClassifier()
+            final_plate_text = [""] * 8
+
+            for idx, g in glyphs:
+                if idx == 2:
+                    class_id = classifier.classify_alphabet(g).get("class_name")
+                else:
+                    class_id = to_farsi_number(
+                        classifier.classify_digit(g).get("class_name")
+                    )
+                final_plate_text[idx] = class_id if class_id else ""
+
+            plate_text = "".join(final_plate_text)
+            self.ocr_results[vid] = plate_text
+
+            try:
+                db.insert_plate(vid, plate_text)
+            except Exception as e:
+                logger.error(
+                    f"[Vehicle {vid}] [Plate {plate_text}] DB insert failed: {e}"
+                )
+
+        except Exception as e:
+            logger.error(f"[Vehicle {vid}] Live OCR failed: {e}")
 
     def mark_seen(self, vid):
         self.missed_frames[vid] = 0
 
     def step_end(self, active_ids, frame_idx):
-        """
-        Call once per frame after updating all tracks.
-        active_ids: set of IDs seen this frame
-        frame_idx: current frame number
-        """
         finalized = []
         for vid in list(self.best_frames.keys()):
             if vid not in active_ids:
@@ -54,85 +96,28 @@ class OnlineBestFrameSelector:
             else:
                 continue
 
-            # finalize if track missing too long
             if self.missed_frames[vid] > self.track_timeout:
                 finalized.append(vid)
-
-            # or finalize if no improvement for too long
             elif (frame_idx - self.last_update.get(vid, 0)) > self.no_improve_patience:
                 finalized.append(vid)
 
         return finalized
 
     def finalize(self, db, vid):
-        """Select the best frame (Save to disk for debugging)."""
+        """Clean up state; OCR is already done incrementally."""
         try:
-            if vid not in self.candidates:
-                return
-    
-            # pick the best-scoring crop
-            best_score, frame_idx, best_crop = max(self.candidates[vid], key=lambda x: x[0])
-            
-            save(best_crop, vid, "best")
-
-            # downstream processing: use full path for processors
-            preprocessor = PlatePreprocessor()
-            preprocessor.preprocess(best_crop)
-
-            segmentation = PlateSegmentation()
-            glyphs = segmentation.segment(best_crop, vid)
-
-            # Classify
-            if glyphs is None:
-                return
-
-            classifier = GlyphClassifier()
-
-            final_plate_text = [""] * 8
-
-            def classify_glyph(idx_g):
-                idx, g = idx_g
-                try:
-                    # item index 2 is non-digit.
-                    if idx == 2:
-                        class_id = classifier.classify_alphabet(g).get("class_name")
-                    else:
-                        class_id = to_farsi_number(
-                            classifier.classify_digit(g).get("class_name")
-                        )
-                    return idx, str(class_id) if class_id is not None else ""
-                except Exception as e:
-                    logger.error(f"Glyph classification failed idx={idx} {e}")
-                    raise
-
-            # with ThreadPoolExecutor() as executor:
-            #     results = executor.map(classify_glyph, glyphs)
-            results = map(classify_glyph, glyphs)
-
-            for idx, class_name in results:
-                final_plate_text[idx] = class_name
-
-            plate_text = "".join(final_plate_text)
-
-            try:
-                db.insert_plate(vid, plate_text)
-            except Exception as e:
-                logger.error(
-                    f"[Vehicle {vid}] [Plate {plate_text}] ⚠️ Failed to write to DB: {e}"
-                )
-            finally:
-                self.cleanup(vid)
-
-            return final_plate_text
+            if vid in self.ocr_results:
+                logger.info(f"[Vehicle {vid}] Final plate: {self.ocr_results[vid]}")
+            self.cleanup(vid)
         except Exception as e:
-            logger.error(f"[Vehicle {vid}] ⚠️ Failed to finalize track: {e}")
+            logger.error(f"[Vehicle {vid}] Finalize error: {e}")
 
     def cleanup(self, vid):
-        # Cleanup
         self.best_frames.pop(vid, None)
-        self.best_scores.pop(vid, None)
+        self.candidates.pop(vid, None)
         self.last_update.pop(vid, None)
         self.missed_frames.pop(vid, None)
+        self.ocr_results.pop(vid, None)
 
 
 def to_farsi_number(s):
