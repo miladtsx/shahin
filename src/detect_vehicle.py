@@ -10,7 +10,6 @@ from src.common_utils.app_logger import get_logger, log_duration
 from concurrent.futures import ThreadPoolExecutor
 from src.common_utils.resource_path import get_resource_path, get_data_path
 from src.common_utils.image_save import save
-from src.common_utils.debug_image import show
 
 logger = get_logger("detect", logfile="logs/app.jsonl")
 
@@ -46,30 +45,27 @@ def run_plate_detection():
                 continue
 
             # 1. Detect vehicles
-            # with log_duration(logger, "detect_vehicles", frame=frame_count):
-            vehicles = detector_vehicle.detect(
-                frame, conf_threshold=conf["car_detection_threshold"]
-            )
-            if vehicles.size == 0:
+            try:
+                # with log_duration(logger, "detect_vehicles", frame=frame_count):
+                vehicles = detector_vehicle.detect(
+                    frame, conf_threshold=conf["car_detection_threshold"]
+                )
+                if vehicles.size == 0:
+                    continue
+            except Exception as e:
+                logger.error(f"Vehicle detection failed at frame {frame_count}: {e}")
                 continue
 
 
-            def to_dicts(vehicles):
-                return [
-                    {
-                        "bbox": (int(x1), int(y1), int(x2), int(y2)),
-                        "conf": float(score),
-                    }
-                    for (x1, y1, x2, y2, score) in vehicles
-                ]
-
-            print("Vehicle Found")
-
             # 2. Track vehicles
-            tracked = tracker.update(vehicles)
-            tracked_vehicles = [
-                {"id": int(trk[4]), "bbox": tuple(map(int, trk[:4]))} for trk in tracked
-            ]
+            try:
+                tracked = tracker.update(vehicles)
+                tracked_vehicles = [
+                    {"id": int(trk[4]), "bbox": tuple(map(int, trk[:4]))} for trk in tracked
+                ]
+            except Exception as e:
+                logger.error(f"Vehicle tracking failed at frame {frame_count}: {e}")
+                continue
 
             active_ids = set()
             vehicle_crops = []
@@ -89,47 +85,50 @@ def run_plate_detection():
                     vehicle_ids.append(vid)
 
             # 4. Batch plate detection
-            plates_batch = detector_plate.detect_batch(
-                vehicle_crops, conf_threshold=conf.get("plate_detection_threshold")
-            )
-
-            print("Detected Plates:", plates_batch)
+            try:
+                plates_batch = detector_plate.detect_batch(
+                    vehicle_crops, conf_threshold=conf.get("plate_detection_threshold")
+                )
+            except Exception as e:
+                logger.error(f"Plate detection failed at frame {frame_count}: {e}")
+                continue
 
             # 5. Process detected plates
             for vid, plates, vh_crop in zip(vehicle_ids, plates_batch, vehicle_crops):
                 if not plates:
                     continue
-                best_crop = None
-                best_score = -1
 
+                # Process all valid plates and let OnlineBestFrameSelector handle quality evaluation
                 for plate in plates:
-                    px1, py1, px2, py2 = shrink_box(*plate["bbox"])
+                    try:
+                        px1, py1, px2, py2 = shrink_box(*plate["bbox"])
 
-                    plate_crop = vh_crop[py1:py2, px1:px2]
-                    if plate_crop.size == 0:
+                        plate_crop = vh_crop[py1:py2, px1:px2]
+                        if plate_crop.size == 0:
+                            continue
+
+                        pw, ph = px2 - px1, py2 - py1
+                        if pw * ph < int(conf.get("crop_dimension_threshold", 0)):
+                            continue
+                        aspect_ratio = pw / ph
+                        if aspect_ratio < 1.5 or aspect_ratio > 6.0:
+                            continue
+
+                        # Let OnlineBestFrameSelector handle quality evaluation
+                        selector.update(vid, plate_crop, frame_count)
+                    except Exception as e:
+                        logger.error(f"Error processing plate for vehicle {vid}: {e}")
                         continue
-
-                    pw, ph = px2 - px1, py2 - py1
-                    if pw * ph < int(conf.get("crop_dimension_threshold", 0)):
-                        continue
-                    aspect_ratio = pw / ph
-                    if aspect_ratio < 1.5 or aspect_ratio > 6.0:
-                        continue
-
-                    score = score_quality(plate_crop)
-                    if score > best_score:
-                        best_score = score
-                        best_crop = plate_crop
-
-                if best_crop is not None:
-                    score, improved = selector.update(vid, best_crop, frame_count)
 
             # 6. Finalize tracks once per frame
-            to_finalize = selector.step_end(active_ids, frame_count)
-            print("Finalizing tracks:", to_finalize)
-            for vid in to_finalize:
-                save(original_frame, vid, "original")
-                executor.submit(selector.finalize, db, vid)
+            try:
+                to_finalize = selector.step_end(active_ids, frame_count)
+                print("Finalizing tracks:", to_finalize)
+                for vid in to_finalize:
+                    save(original_frame, vid, "original")
+                    executor.submit(selector.finalize, db, vid)
+            except Exception as e:
+                logger.error(f"Track finalization failed at frame {frame_count}: {e}")
     except Exception as e:
         logger.exception(f"run_plate_detection_failed: {e}")
     finally:
