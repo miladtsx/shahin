@@ -42,8 +42,7 @@ class OnlineBestFrameSelector:
         if prev_best is None or score > prev_best[0] * (1 + self.improve_margin):
             # Found a significantly better frame -> trigger OCR now
             self.best_frames[vid] = (score, crop, frame_idx)
-            if executor and db:
-                executor.submit(self._run_ocr, db, vid, crop)
+            self._run_ocr(db, vid, crop)
 
         return score
 
@@ -53,10 +52,10 @@ class OnlineBestFrameSelector:
             save(crop, vid, "best_live")
 
             preprocessor = PlatePreprocessor()
-            preprocessor.preprocess(crop)
+            preprocessed = preprocessor.preprocess(crop)
 
             segmentation = PlateSegmentation()
-            glyphs = segmentation.segment(crop, vid)
+            glyphs = segmentation.segment(preprocessed, vid)
             if glyphs is None:
                 return
 

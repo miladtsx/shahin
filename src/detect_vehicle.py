@@ -38,7 +38,7 @@ def run_plate_detection():
     )
     tracker = Sort()
     selector = OnlineBestFrameSelector(score_quality)
-    executor = ThreadPoolExecutor(max_workers=4)
+    executor = ThreadPoolExecutor(max_workers=8)
 
     logger.info("Starting continuous plate detection service...")
 
@@ -145,7 +145,7 @@ def run_plate_detection():
                                 continue
 
                             # Let OnlineBestFrameSelector handle quality evaluation
-                            selector.update(vid, plate_crop, frame_count)
+                            selector.update(vid, plate_crop, frame_count, db, executor)
                         except Exception as e:
                             logger.error(
                                 f"Error processing plate for vehicle {vid}: {e}"
