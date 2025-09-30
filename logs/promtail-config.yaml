@@ -1,0 +1,46 @@
+# Promtail configuration to scrape JSON-lines logs produced by this app
+# Customize the __path__ below to point to your logs directory if needed.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/promtail-positions.yaml
+
+clients:
+  - url: http://localhost:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: app-jsonl
+    static_configs:
+      - targets: ['localhost']
+        labels:
+          job: app
+          __path__: ./logs/*.jsonl   # change to absolute path if running from another cwd
+
+    pipeline_stages:
+      # parse each line as JSON and extract common fields
+      - json:
+          expressions:
+            ts: ts
+            level: level
+            message: message
+            operation: operation
+            duration_ms: duration_ms
+            trace_id: trace_id
+            # any other fields produced by the app will be available as attributes
+
+      # promote selected fields to labels for fast querying in Loki
+      - labels:
+          level:
+          operation:
+
+      # use the ts field from the JSON as the event timestamp
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
+
+      # optional - remove the original ts field from the log line (keeps data smaller)
+      - output:
+          source: message

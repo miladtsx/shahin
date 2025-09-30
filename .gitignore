@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+output_frames/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application
+out/
+res/data/sample_video
+res/data/raw_plate
+res/data/synthetic
+res/data/train
+res/data/train_split
+res/db/plates.db
+debug
+runs/
+logs/app.jsonl
+frontend/build
+frontend/app.spec
