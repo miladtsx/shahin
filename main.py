@@ -9,8 +9,8 @@ def main():
         run_plate_detection()
 
         logger.info("application_exit", extra={"event": "application_exit"})
-    except Exception:
-        logger.exception("unhandled_exception")
+    except Exception as e:
+        logger.exception(f"unhandled_exception:\n {e}")
     finally:
         sys.exit(0)
 
