@@ -42,7 +42,8 @@ class OnlineBestFrameSelector:
         if prev_best is None or score > prev_best[0] * (1 + self.improve_margin):
             # Found a significantly better frame -> trigger OCR now
             self.best_frames[vid] = (score, crop, frame_idx)
-            self._run_ocr(db, vid, crop)
+            if executor and db:
+                executor.submit(self._run_ocr, db, vid, crop.copy())
 
         return score
 
