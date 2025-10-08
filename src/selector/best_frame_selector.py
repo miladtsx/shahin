@@ -30,6 +30,10 @@ class OnlineBestFrameSelector:
         self.improve_margin = improve_margin
         self.ocr_results = {}  # vid -> latest OCR text
 
+        self.preprocessor = PlatePreprocessor()
+        self.segmentation = PlateSegmentation()
+        self.classifier = GlyphClassifier()
+
     def update(self, vid, crop, frame_idx, db=None, executor=None):
         score = self.scorer(crop)
         heappush(self.candidates[vid], (score, frame_idx, crop))
@@ -52,23 +56,20 @@ class OnlineBestFrameSelector:
         try:
             save(crop, vid, "best_live")
 
-            preprocessor = PlatePreprocessor()
-            preprocessed = preprocessor.preprocess(crop)
+            preprocessed = self.preprocessor.preprocess(crop)
 
-            segmentation = PlateSegmentation()
-            glyphs = segmentation.segment(preprocessed, vid)
+            glyphs = self.segmentation.segment(preprocessed, vid)
             if glyphs is None:
                 return
 
-            classifier = GlyphClassifier()
             final_plate_text = [""] * 8
 
             for idx, g in glyphs:
                 if idx == 2:
-                    class_id = classifier.classify_alphabet(g).get("class_name")
+                    class_id = self.classifier.classify_alphabet(g).get("class_name")
                 else:
                     class_id = to_farsi_number(
-                        classifier.classify_digit(g).get("class_name")
+                        self.classifier.classify_digit(g).get("class_name")
                     )
                 final_plate_text[idx] = class_id if class_id else ""
 
