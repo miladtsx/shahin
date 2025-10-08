@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fa">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>شاهین — سامانه رهگیری پلاک خودرو</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='dashboard.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <a href="https://tally.so/r/nWL0Yv" target="_blank">
+        <div class="header">
+          <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" />
+          <h1>شاهین — سامانه رهگیری پلاک خودرو</h1>
+        </div>
+      </a>
+
+      <!-- Main Card -->
+      <div class="card">
+        <!-- Card Header -->
+        <div class="card-header">
+          <button class="button new-plate" onclick="openAddPlateModal()">
+            افزودن
+          </button>
+          <button class="button toggle-filter" onclick="toggleFilterBar()">
+            فیلتر
+          </button>
+          <button
+            class="button export-btn"
+            title="استخراج CSV"
+            onclick="exportCSV()"
+          >
+            خروجی CSV
+          </button>
+        </div>
+
+        <!-- Filter Bar -->
+        <div id="filterBar" class="filter-bar">
+          <div class="filter-buttons">
+            <input id="filterPlate" placeholder="جستجوی پلاک" />
+            <input id="filterStart" type="datetime-local" />
+            <input id="filterEnd" type="datetime-local" />
+            <button class="button apply-filter-btn" onclick="applyFilters()">
+              فیلتر
+            </button>
+            <button class="button clear-filter-btn" onclick="clearFilters()">
+              &times;
+            </button>
+          </div>
+        </div>
+
+        <!-- Plates Table -->
+        <table>
+          <thead>
+            <tr>
+              <th>شناسه</th>
+              <th>تصویر</th>
+              <th>شماره</th>
+              <th>زمان ثبت</th>
+              <th>عملیات</th>
+            </tr>
+          </thead>
+          <tbody class="center-text" id="plates_body"></tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="pagination-container">
+          <div class="per-page-select">
+            <label>
+              نمایش در هر صفحه:
+              <select id="perPageSelect" onchange="onPerPageChange()">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="pagination-controls">
+            <button class="button" id="nextPageBtn" onclick="changePage(1)">
+              بعدی
+            </button>
+            <span id="pageInfo">صفحه 1</span>
+            <button class="button" id="prevPageBtn" onclick="changePage(-1)">
+              قبلی
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"></div>
+
+    <!-- Image Modal -->
+    <div id="imgModal" class="modal" onclick="closePlateImageModal()">
+      <img id="modalImg" class="modal-content" />
+    </div>
+
+    <!-- Add Plate Modal -->
+    <div id="addPlateModal" class="modal">
+      <div class="modal-content">
+        <h3>ثبت پلاک جدید</h3>
+        <input
+          id="modal_plate_text"
+          maxlength="7"
+          maxlength="7"
+          placeholder="شماره پلاک را وارد کنید"
+        />
+        <div class="modal-actions">
+          <button
+            id="submitBtn"
+            class="button new-plate"
+            onclick="submitAddPlate()"
+          >
+            ثبت
+          </button>
+          <button
+            class="button clear-filter-btn"
+            onclick="closeAddPlateModal()"
+          >
+            لغو
+          </button>
+        </div>
+        <span class="modal-close" onclick="closeAddPlateModal()">&times;</span>
+      </div>
+    </div>
+
+    <!-- Image Details Modal -->
+    <div id="imgDetailsModal" class="modal">
+      <div class="modal-content">
+        <span class="modal-close" onclick="closePlateImageModal()"
+          >&times;</span
+        >
+        <div class="modal-body">
+          <img id="modalLargeImg" />
+          <div class="modalDetails" id="modalDetails"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+      <div class="modal-content">
+        <p id="confirmMessage"></p>
+        <!-- <div class="plate-delete-modal"> -->
+        <div class="modal-actions">
+          <button
+            id="confirmYes"
+            class="button new-plate"
+            onclick="submitAddPlate()"
+          >
+            بله
+          </button>
+          <button
+            id="confirmNo"
+            class="button clear-filter-btn"
+            onclick="closeAddPlateModal()"
+          >
+            خیر
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="{{ url_for('static', filename='dashboard.js') }}"
+      defer
+    ></script>
+  </body>
+  <footer>
+    © ۱۴۰۴ شاهین &mdash; تمامی حقوق محفوظ می‌باشد.
+
+    <a
+      href="https://tally.so/r/nWL0Yv"
+      target="_blank"
+    >
+      ☎
+    </a>
+  </footer>
+</html>
