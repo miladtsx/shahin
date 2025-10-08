@@ -34,7 +34,7 @@ class OnlineBestFrameSelector:
         self.segmentation = PlateSegmentation()
         self.classifier = GlyphClassifier()
 
-    def update(self, vid, crop, frame_idx, db=None, executor=None):
+    def update(self, vid, crop, original_frame, frame_idx, db=None, executor=None):
         score = self.scorer(crop)
         heappush(self.candidates[vid], (score, frame_idx, crop))
         if len(self.candidates[vid]) > self.k:
@@ -45,16 +45,18 @@ class OnlineBestFrameSelector:
         prev_best = self.best_frames.get(vid)
         if prev_best is None or score > prev_best[0] * (1 + self.improve_margin):
             # Found a significantly better frame -> trigger OCR now
-            self.best_frames[vid] = (score, crop, frame_idx)
+            self.best_frames[vid] = (score, crop, frame_idx, original_frame)
             if executor and db:
-                executor.submit(self._run_ocr, db, vid, crop.copy())
+                executor.submit(self._run_ocr, db, vid)
 
         return score
 
-    def _run_ocr(self, db, vid, crop):
+    def _run_ocr(self, db, vid):
         """Run OCR immediately on the current best crop and overwrite previous result."""
         try:
+            (_, crop, _, original_frame) = self.best_frames[vid]
             save(crop, vid, "best_live")
+            save(original_frame, vid, "original")
 
             preprocessed = self.preprocessor.preprocess(crop)
 
@@ -108,7 +110,7 @@ class OnlineBestFrameSelector:
 
         return finalized
 
-    def finalize(self, db, vid):
+    def finalize(self, vid):
         """Clean up state; OCR is already done incrementally."""
         try:
             if vid in self.ocr_results:

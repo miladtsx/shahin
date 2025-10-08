@@ -145,7 +145,7 @@ def run_plate_detection():
                                 continue
 
                             # Let OnlineBestFrameSelector handle quality evaluation
-                            selector.update(vid, plate_crop, frame_count, db, executor)
+                            selector.update(vid, plate_crop, original_frame, frame_count, db, executor)
                         except Exception as e:
                             logger.error(
                                 f"Error processing plate for vehicle {vid}: {e}"
@@ -158,8 +158,7 @@ def run_plate_detection():
                     if len(to_finalize):
                         print("Finalizing tracks:", to_finalize)
                         for vid in to_finalize:
-                            save(original_frame, vid, "original")
-                            executor.submit(selector.finalize, db, vid)
+                            executor.submit(selector.finalize, vid)
                 except Exception as e:
                     logger.error(
                         f"Track finalization failed at frame {frame_count}: {e}"
