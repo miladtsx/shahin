@@ -37,7 +37,11 @@ def run_plate_detection():
         get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
     )
     tracker = Sort()
-    selector = OnlineBestFrameSelector(score_quality)
+    selector = OnlineBestFrameSelector(
+        score_quality,
+        no_improve_patience=conf.get("no_improve_patience", 20),
+        track_timeout=conf.get("track_timeout", 15),
+    )
     executor = ThreadPoolExecutor(max_workers=8)
 
     logger.info("Starting continuous plate detection service...")
@@ -92,12 +96,13 @@ def run_plate_detection():
                 active_ids = set()
                 vehicle_crops = []
                 vehicle_ids = []
+                show(draw_boxes(frame, tracked_vehicles), "Vehicle")
 
                 # 3. Prepare crops
                 for trk in tracked_vehicles:
                     vid = trk["id"]
                     active_ids.add(vid)
-                    selector.mark_seen(vid)
+                    selector.mark_seen(vid, frame_count, original_frame=frame)
                     x1, y1, x2, y2 = trk["bbox"]
                     car_crop = frame[y1:y2, x1:x2]
                     original_frame = frame
@@ -136,6 +141,7 @@ def run_plate_detection():
                             plate_crop = vh_crop[py1:py2, px1:px2]
                             if plate_crop.size == 0:
                                 continue
+                            show(plate_crop, "Plate")
 
                             pw, ph = px2 - px1, py2 - py1
                             if pw * ph < int(conf.get("crop_dimension_threshold", 0)):
@@ -145,7 +151,7 @@ def run_plate_detection():
                                 continue
 
                             # Let OnlineBestFrameSelector handle quality evaluation
-                            selector.update(vid, plate_crop, original_frame, frame_count, db, executor)
+                            selector.update(vid, plate_crop, frame_count, original_frame=frame)
                         except Exception as e:
                             logger.error(
                                 f"Error processing plate for vehicle {vid}: {e}"
@@ -156,9 +162,8 @@ def run_plate_detection():
                 try:
                     to_finalize = selector.step_end(active_ids, frame_count)
                     if len(to_finalize):
-                        print("Finalizing tracks:", to_finalize)
                         for vid in to_finalize:
-                            executor.submit(selector.finalize, vid)
+                            executor.submit(selector.finalize, db, vid)
                 except Exception as e:
                     logger.error(
                         f"Track finalization failed at frame {frame_count}: {e}"
