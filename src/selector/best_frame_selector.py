@@ -91,16 +91,20 @@ class OnlineBestFrameSelector:
 
     def step_end(self, active_ids, frame_idx):
         finalized = []
-        for vid in list(self.best_frames.keys()):
+        all_tracked_vids = list(self.last_update.keys())
+        for vid in all_tracked_vids:
+            # Condition 1: Vehicle has disappeared from the frame
             if vid not in active_ids:
                 self.missed_frames[vid] += 1
-            else:
-                continue
+                if self.missed_frames[vid] > self.track_timeout:
+                    finalized.append(vid)
+                    continue
 
-            if self.missed_frames[vid] > self.track_timeout:
-                finalized.append(vid)
-            elif (frame_idx - self.last_update.get(vid, 0)) > self.no_improve_patience:
-                finalized.append(vid)
+            # Condition 2: Vehicle is present, but no better frame has been found
+            if vid in self.best_frames:
+                best_score_frame_idx = self.best_frames[vid][2]
+                if (frame_idx - best_score_frame_idx) > self.no_improve_patience:
+                    finalized.append(vid)
 
         return finalized
 
