@@ -23,6 +23,8 @@ class DB:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     vehicle_id TEXT,
                     plate_text TEXT,
+                    car_type TEXT,
+                    car_color TEXT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """

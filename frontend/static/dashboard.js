@@ -51,9 +51,9 @@ async function fetchPlates(query = "") {
 
     const imgTd = document.createElement("td");
     imgTd.innerHTML = `<img src="/plate_image/${p.vehicle_id}/best" 
-    onclick='openPlateImageModal("/plate_image/${p.vehicle_id}/original", ${JSON.stringify(
-      p
-    ).replace(/"/g, "&quot;")})'>`;
+    onclick='openPlateImageModal("/plate_image/${
+      p.vehicle_id
+    }/original", ${JSON.stringify(p).replace(/"/g, "&quot;")})'>`;
     tr.appendChild(imgTd);
 
     // Plate glyphs cell
@@ -124,6 +124,12 @@ function openPlateImageModal(src, plateData) {
     <p><strong>شماره پلاک:</strong> <input class="center-text" id="editPlateText" value="${
       plateData.plate_text
     }"></p>
+    <p><strong>بدنه خودرو:</strong> <input class="center-text" id="editCarType" value="${
+      plateData.car_type
+    }"></p>
+  <p><strong>رنگ خودرو:</strong> <input class="center-text" id="editCarColor" value="${
+    plateData.car_color
+  }"></p>
     </div>
     <div class="modal-actions">
       <button class="button new-plate" onclick="confirmUpdatePlate(${
@@ -164,10 +170,16 @@ function confirmUpdatePlate(id) {
     `آیا از بروزرسانی پلاک ${toFarsiNumber(id)} مطمئنید؟`,
     async () => {
       const newPlate = document.getElementById("editPlateText").value;
+      const newCarType = document.getElementById("editCarType").value;
+      const newCarColor = document.getElementById("editCarColor").value;
       await fetch(`/plates/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plate_text: newPlate }),
+        body: JSON.stringify({ 
+          plate_text: newPlate,
+          car_type: newCarType,
+          car_color: newCarColor
+         }),
       });
       showToast("پلاک بروزرسانی شد");
       fetchPlates();
@@ -272,10 +284,14 @@ function openAddPlateModal() {
 function closeAddPlateModal() {
   document.getElementById("addPlateModal").style.display = "none";
   document.getElementById("modal_plate_text").value = "";
+  document.getElementById("modal_car_type").value = "";
+  document.getElementById("modal_car_color").value = "";
 }
 
 async function submitAddPlate() {
   const plate = document.getElementById("modal_plate_text").value;
+  const carType = document.getElementById("modal_car_type").value;
+  const carColor = document.getElementById("modal_car_color").value;
   if (plate.length < 7) return showToast("پلاک ۸ رقم دارد", 2000);
 
   try {
@@ -285,6 +301,8 @@ async function submitAddPlate() {
       body: JSON.stringify({
         vehicle_id: 0,
         plate_text: plate,
+        car_type: carType,
+        car_color: carColor,
       }),
     });
     const data = await res.json();
@@ -408,98 +426,108 @@ document
 
 // #region Settings Modal
 function openSettingsModal() {
-    document.getElementById('settingsModal').style.display = 'flex';
-    loadSettings();
+  document.getElementById("settingsModal").style.display = "flex";
+  loadSettings();
 }
 
 function closeSettingsModal() {
-    document.getElementById('settingsModal').style.display = 'none';
+  document.getElementById("settingsModal").style.display = "none";
 }
 
 async function loadSettings() {
-    const response = await fetch('/settings');
-    const config = await response.json();
-    for (const key in config) {
-        const input = document.getElementById(key);
-        if (input) {
-            input.value = config[key];
-        }
+  const response = await fetch("/settings");
+  const config = await response.json();
+  for (const key in config) {
+    const input = document.getElementById(key);
+    if (input) {
+      input.value = config[key];
     }
-    updateVideoStream();
-    checkBackendStatus();
+  }
+  updateVideoStream();
+  checkBackendStatus();
 }
 
 async function saveSettings() {
-    const config = {
-        video_path: document.getElementById('video_path').value,
-        frame_skip: parseInt(document.getElementById('frame_skip').value),
-        car_detection_threshold: parseFloat(document.getElementById('car_detection_threshold').value),
-        plate_detection_threshold: parseFloat(document.getElementById('plate_detection_threshold').value),
-        crop_dimension_threshold: parseInt(document.getElementById('crop_dimension_threshold').value),
-    };
+  const config = {
+    video_path: document.getElementById("video_path").value,
+    frame_skip: parseInt(document.getElementById("frame_skip").value),
+    car_detection_threshold: parseFloat(
+      document.getElementById("car_detection_threshold").value
+    ),
+    plate_detection_threshold: parseFloat(
+      document.getElementById("plate_detection_threshold").value
+    ),
+    crop_dimension_threshold: parseInt(
+      document.getElementById("crop_dimension_threshold").value
+    ),
+  };
 
-    await fetch('/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-    });
+  await fetch("/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
 
-    showToast('در حال راه‌اندازی مجدد با تنظیمات جدید');
-    setTimeout(checkBackendStatus, 2000); // Check status after a delay
-    closeSettingsModal();
+  showToast("در حال راه‌اندازی مجدد با تنظیمات جدید");
+  setTimeout(checkBackendStatus, 2000); // Check status after a delay
+  closeSettingsModal();
 }
 
 function updateVideoStream() {
-    const videoPath = document.getElementById('video_path').value;
-    const videoFeed = document.getElementById('videoFeed');
-    if (videoPath) {
-        videoFeed.src = `/video_feed?url=${encodeURIComponent(videoPath)}&t=${new Date().getTime()}`;
-    } else {
-        videoFeed.src = "";
-    }
+  const videoPath = document.getElementById("video_path").value;
+  const videoFeed = document.getElementById("videoFeed");
+  if (videoPath) {
+    videoFeed.src = `/video_feed?url=${encodeURIComponent(
+      videoPath
+    )}&t=${new Date().getTime()}`;
+  } else {
+    videoFeed.src = "";
+  }
 }
 
 async function checkBackendStatus() {
-    try {
-        const response = await fetch('/status');
-        const data = await response.json();
-        document.getElementById('backendStatus').textContent = data.status;
-    } catch (error) {
-        document.getElementById('backendStatus').textContent = 'Error';
-    }
+  try {
+    const response = await fetch("/status");
+    const data = await response.json();
+    document.getElementById("backendStatus").textContent = data.status;
+  } catch (error) {
+    document.getElementById("backendStatus").textContent = "Error";
+  }
 }
 
-window.addEventListener('load', () => {
-    // Load settings on page load if you want to pre-populate or check status
-    // loadSettings(); 
-    
-    // Check backend status periodically
-    setInterval(checkBackendStatus, 5000);
+window.addEventListener("load", () => {
+  // Load settings on page load if you want to pre-populate or check status
+  // loadSettings();
 
-    const videoWrapper = document.querySelector('.video-preview-wrapper');
-    const videoFeed = document.getElementById('videoFeed');
+  // Check backend status periodically
+  setInterval(checkBackendStatus, 5000);
 
-    if (videoWrapper && videoFeed) {
-        videoWrapper.addEventListener('dblclick', () => {
-            if (!videoWrapper.classList.contains('fullscreen')) {
-                // Enter fullscreen on double-click
-                videoWrapper.classList.add('fullscreen');
-            } else {
-                // Exit fullscreen on double-click
-                videoWrapper.classList.remove('fullscreen');
-                updateVideoStream(); // Resume stream with new timestamp
-            }
-        });
-    }
+  const videoWrapper = document.querySelector(".video-preview-wrapper");
+  const videoFeed = document.getElementById("videoFeed");
+
+  if (videoWrapper && videoFeed) {
+    videoWrapper.addEventListener("dblclick", () => {
+      if (!videoWrapper.classList.contains("fullscreen")) {
+        // Enter fullscreen on double-click
+        videoWrapper.classList.add("fullscreen");
+      } else {
+        // Exit fullscreen on double-click
+        videoWrapper.classList.remove("fullscreen");
+        updateVideoStream(); // Resume stream with new timestamp
+      }
+    });
+  }
 });
 
 function updateVideoStream() {
-    const videoPath = document.getElementById('video_path').value;
-    const videoFeed = document.getElementById('videoFeed');
-    if (videoPath) {
-        videoFeed.src = `/video_feed?url=${encodeURIComponent(videoPath)}&t=${new Date().getTime()}`;
-    } else {
-        videoFeed.src = "";
-    }
+  const videoPath = document.getElementById("video_path").value;
+  const videoFeed = document.getElementById("videoFeed");
+  if (videoPath) {
+    videoFeed.src = `/video_feed?url=${encodeURIComponent(
+      videoPath
+    )}&t=${new Date().getTime()}`;
+  } else {
+    videoFeed.src = "";
+  }
 }
 // #endregion

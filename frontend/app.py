@@ -68,7 +68,7 @@ def list_plates():
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
 
-    query = "SELECT id, vehicle_id, plate_text, timestamp FROM plates WHERE 1=1"
+    query = "SELECT id, vehicle_id, plate_text, car_type, car_color, timestamp FROM plates WHERE 1=1"
     params = []
     if plate_text:
         query += " AND plate_text LIKE ?"
@@ -103,6 +103,8 @@ def list_plates():
         cur.execute(count_q, count_params)
         total = cur.fetchone()[0]
 
+        print(rows)
+
     return jsonify(
         {
             "items": [
@@ -110,7 +112,9 @@ def list_plates():
                     "id": r[0],
                     "vehicle_id": r[1],
                     "plate_text": r[2],
-                    "timestamp": r[3],
+                    "car_type": r[3],
+                    "car_color": r[4],
+                    "timestamp": r[5],
                 }
                 for r in rows
             ],
@@ -124,8 +128,13 @@ def create_plate():
     data = request.json
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO plates (vehicle_id, plate_text) VALUES (?, ?)",
-            (data["vehicle_id"], data["plate_text"]),
+            "INSERT INTO plates (vehicle_id, plate_text, car_type, car_color) VALUES (?, ?, ?, ?)",
+            (
+                data["vehicle_id"],
+                data["plate_text"],
+                data["car_type"],
+                data["car_color"],
+            ),
         )
         conn.commit()
     return jsonify({"status": "created"})
@@ -193,17 +202,19 @@ def export_plates_csv():
 
 backend_process = None
 
+
 def get_config_path():
     return get_data_path("config.yaml")
+
 
 def start_backend():
     global backend_process
     if backend_process is None or backend_process.poll() is not None:
         # TODO: in production use absolute paths
         backend_process = subprocess.Popen(
-            [sys.executable, "main.py"],
-            preexec_fn=os.setsid
+            [sys.executable, "main.py"], preexec_fn=os.setsid
         )
+
 
 def stop_backend():
     global backend_process
@@ -215,11 +226,13 @@ def stop_backend():
             os.killpg(os.getpgid(backend_process.pid), signal.SIGKILL)
     backend_process = None
 
+
 def restart_backend():
     stop_backend()
     # Give it a moment to release resources if needed
     time.sleep(5)
     start_backend()
+
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
@@ -228,10 +241,10 @@ def settings():
         new_config = request.json
         with open(config_path, "w") as f:
             yaml.safe_dump(new_config, f)
-        
+
         restart_backend()
         return jsonify({"status": "در حال اجرا با تنظیمات جدید"})
-    
+
     # GET
     try:
         with open(config_path, "r") as f:
@@ -239,6 +252,7 @@ def settings():
             return jsonify(config)
     except FileNotFoundError:
         return jsonify({"error": "تنظیمات یافت نشد -- شاهین را مجدد تمیز اجرا نمایید"})
+
 
 def gen_frames(video_url):
     cap = cv2.VideoCapture(video_url)
@@ -251,26 +265,28 @@ def gen_frames(video_url):
         if not success:
             break
         else:
-            ret, buffer = cv2.imencode('.jpg', frame)
+            ret, buffer = cv2.imencode(".jpg", frame)
             frame = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
     cap.release()
 
 
-@app.route('/video_feed')
+@app.route("/video_feed")
 def video_feed():
-    video_url = request.args.get('url')
+    video_url = request.args.get("url")
     if not video_url:
         return "Error: no video URL provided", 400
-    return Response(gen_frames(video_url),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        gen_frames(video_url), mimetype="multipart/x-mixed-replace; boundary=frame"
+    )
 
-@app.route('/status')
+
+@app.route("/status")
 def backend_status():
     if backend_process and backend_process.poll() is None:
         return jsonify({"status": "درحال اجرا"})
     return jsonify({"status": "غیرفعال"})
+
 
 def run_app():
     app.run(port=PORT, debug=False, use_reloader=True)
@@ -287,6 +303,8 @@ if __name__ == "__main__":
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     vehicle_id TEXT,
                     plate_text TEXT,
+                    car_type TEXT,
+                    car_color TEXT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
                 """
@@ -297,6 +315,7 @@ if __name__ == "__main__":
     try:
         start_backend()
         import atexit
+
         atexit.register(stop_backend)
     except Exception as e:
         print(f"Error starting backend: {e}")
