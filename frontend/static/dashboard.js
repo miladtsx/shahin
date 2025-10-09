@@ -64,13 +64,16 @@ async function fetchPlates(query = "") {
     // Timestamp cell
     const tsTd = document.createElement("td");
     const date = new Date(p.timestamp);
+    const tehranTime = date.toLocaleString("fa-IR", {
+      timeZone: "Asia/Tehran",
+      hour12: false,
+    });
+    const [tehranDate, tehranClock] = tehranTime.split(", ");
     tsTd.innerHTML = `
     <div>
-      <span>${toFarsiNumber(date.toLocaleDateString())}</span>
+      <span>${toFarsiNumber(tehranDate)}</span>
       <br/>
-      <span>${toFarsiNumber(
-        date.toLocaleTimeString([], { hour12: false })
-      )}</span>
+      <span>${toFarsiNumber(tehranClock)}</span>
     </div>
     `;
     tr.appendChild(tsTd);
