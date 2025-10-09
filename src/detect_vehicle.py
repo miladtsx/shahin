@@ -89,6 +89,8 @@ def run_plate_detection():
                         {"id": int(trk[4]), "bbox": tuple(map(int, trk[:4]))}
                         for trk in tracked
                     ]
+                    # Update tracker IDs to UUIDs
+                    tracked_vehicles = [detector_vehicle.get_uuid(v) for v in tracked_vehicles]
                 except Exception as e:
                     logger.error(f"Vehicle tracking failed at frame {frame_count}: {e}")
                     continue

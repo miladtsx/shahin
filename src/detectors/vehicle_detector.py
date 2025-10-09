@@ -1,12 +1,21 @@
 from ultralytics import YOLO
 import cv2
 import numpy as np
+import uuid
 
 class VehicleDetector:
     def __init__(self, model_path, allowed_classes):
         self.model = YOLO(model_path, task="detect", verbose=False)
         self.allowed = set(allowed_classes)
         self.class_names = self.model.names
+        self.id_map = {}
+
+    def get_uuid(self, tracked_vehicle):
+        vid = tracked_vehicle["id"]
+        if vid not in self.id_map:
+            self.id_map[vid] = str(uuid.uuid4())[:8]
+        tracked_vehicle["id"] = self.id_map[vid]
+        return tracked_vehicle
 
     def detect(self, frame, conf_threshold=0.5):
         results = self.model(frame, verbose=False)[0]
