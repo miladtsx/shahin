@@ -186,6 +186,16 @@ table td {
     background: #5a6268;
 }
 
+.icon-button {
+    background: none;
+    color: black;
+    padding: 10px;
+    font-size: 1.2rem;
+}
+
+.icon-button:hover {
+    background: #f0f0f0;
+}
 
 
 .filter-buttons {
