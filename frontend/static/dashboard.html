@@ -168,6 +168,42 @@
       </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeSettingsModal()">&times;</span>
+            <h3>تنظیمات</h3>
+            <div class="settings-container">
+                <div class="video-preview-wrapper">
+                    <img id="videoFeed" src="" alt="Video Preview">
+                    <p>وضعیت سرویس: <span id="backendStatus">نامشخص</span></p>
+                </div>
+                <div class="settings-form-wrapper">
+                    <div class="settings-form">
+                        <label for="video_path" title="مسیر فایل ویدیویی یا آدرس استریم دوربین.">آدرس دوربین:</label>
+                        <input type="text" dir="ltr" id="video_path" name="video_path" oninput="updateVideoStream()">
+                        
+                        <label for="frame_skip" title="تعداد فریم‌هایی که بین هر پردازش رد می‌شوند.">تعداد فریم‌های قابل رد کردن:</label>
+                        <input type="number" id="frame_skip" name="frame_skip">
+
+                        <label for="car_detection_threshold" title="حداقل اطمینان برای تشخیص خودرو (بین ۰ تا ۱).">حساسیت تشخیص خودرو:</label>
+                        <input type="number" step="0.1" id="car_detection_threshold" name="car_detection_threshold">
+                        
+                        <label for="plate_detection_threshold" title="حداقل اطمینان برای تشخیص پلاک (بین ۰ تا ۱).">حساسیت تشخیص پلاک:</label>
+                        <input type="number" step="0.1" id="plate_detection_threshold" name="plate_detection_threshold">
+                        
+                        <label for="crop_dimension_threshold" title="حداقل ابعاد (عرض یا ارتفاع) برای برش پلاک.">آستانه ابعاد برش پلاک:</label>
+                        <input type="number" id="crop_dimension_threshold" name="crop_dimension_threshold">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="button new-plate" onclick="saveSettings()">ذخیره و راه‌اندازی مجدد</button>
+                <button class="button clear-filter-btn" onclick="closeSettingsModal()">لغو</button>
+            </div>
+        </div>
+    </div>
+
     <script
       src="{{ url_for('static', filename='dashboard.js') }}"
       defer
@@ -182,5 +218,6 @@
     >
       ☎
     </a>
+    <a href="#" onclick="openSettingsModal()" class="settings-icon">⚙️</a>
   </footer>
 </html>

@@ -2,6 +2,11 @@ from io import StringIO
 import os, sys
 import sqlite3
 import webbrowser
+import yaml
+import subprocess
+import signal
+import time
+import cv2
 from flask import (
     Flask,
     request,
@@ -186,8 +191,89 @@ def export_plates_csv():
     return Response(output, headers=headers)
 
 
+backend_process = None
+
+def get_config_path():
+    return get_data_path("config.yaml")
+
+def start_backend():
+    global backend_process
+    if backend_process is None or backend_process.poll() is not None:
+        # TODO: in production use absolute paths
+        backend_process = subprocess.Popen(
+            [sys.executable, "main.py"],
+            preexec_fn=os.setsid
+        )
+
+def stop_backend():
+    global backend_process
+    if backend_process and backend_process.poll() is None:
+        os.killpg(os.getpgid(backend_process.pid), signal.SIGTERM)
+        try:
+            backend_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            os.killpg(os.getpgid(backend_process.pid), signal.SIGKILL)
+    backend_process = None
+
+def restart_backend():
+    stop_backend()
+    # Give it a moment to release resources if needed
+    time.sleep(5)
+    start_backend()
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    config_path = get_config_path()
+    if request.method == "POST":
+        new_config = request.json
+        with open(config_path, "w") as f:
+            yaml.safe_dump(new_config, f)
+        
+        restart_backend()
+        return jsonify({"status": "در حال اجرا با تنظیمات جدید"})
+    
+    # GET
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+            return jsonify(config)
+    except FileNotFoundError:
+        return jsonify({"error": "تنظیمات یافت نشد -- شاهین را مجدد تمیز اجرا نمایید"})
+
+def gen_frames(video_url):
+    cap = cv2.VideoCapture(video_url)
+    if not cap.isOpened():
+        print(f"ویدئو یافت نشد {video_url}")
+        return
+
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
+        else:
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    cap.release()
+
+
+@app.route('/video_feed')
+def video_feed():
+    video_url = request.args.get('url')
+    if not video_url:
+        return "Error: no video URL provided", 400
+    return Response(gen_frames(video_url),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/status')
+def backend_status():
+    if backend_process and backend_process.poll() is None:
+        return jsonify({"status": "درحال اجرا"})
+    return jsonify({"status": "غیرفعال"})
+
 def run_app():
-    app.run(port=PORT, debug=False, use_reloader=False)
+    app.run(port=PORT, debug=False, use_reloader=True)
 
 
 if __name__ == "__main__":
@@ -208,5 +294,11 @@ if __name__ == "__main__":
             conn.commit()
 
     # Thread(target=run_app).start()
+    try:
+        start_backend()
+        import atexit
+        atexit.register(stop_backend)
+    except Exception as e:
+        print(f"Error starting backend: {e}")
     run_app()
     webbrowser.open(f"http://127.0.0.1:{PORT}")

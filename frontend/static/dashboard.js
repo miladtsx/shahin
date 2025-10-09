@@ -405,3 +405,101 @@ document
       applyFilters(this.value.trim());
     }
   });
+
+// #region Settings Modal
+function openSettingsModal() {
+    document.getElementById('settingsModal').style.display = 'flex';
+    loadSettings();
+}
+
+function closeSettingsModal() {
+    document.getElementById('settingsModal').style.display = 'none';
+}
+
+async function loadSettings() {
+    const response = await fetch('/settings');
+    const config = await response.json();
+    for (const key in config) {
+        const input = document.getElementById(key);
+        if (input) {
+            input.value = config[key];
+        }
+    }
+    updateVideoStream();
+    checkBackendStatus();
+}
+
+async function saveSettings() {
+    const config = {
+        video_path: document.getElementById('video_path').value,
+        frame_skip: parseInt(document.getElementById('frame_skip').value),
+        car_detection_threshold: parseFloat(document.getElementById('car_detection_threshold').value),
+        plate_detection_threshold: parseFloat(document.getElementById('plate_detection_threshold').value),
+        crop_dimension_threshold: parseInt(document.getElementById('crop_dimension_threshold').value),
+    };
+
+    await fetch('/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+    });
+
+    showToast('در حال راه‌اندازی مجدد با تنظیمات جدید');
+    setTimeout(checkBackendStatus, 2000); // Check status after a delay
+    closeSettingsModal();
+}
+
+function updateVideoStream() {
+    const videoPath = document.getElementById('video_path').value;
+    const videoFeed = document.getElementById('videoFeed');
+    if (videoPath) {
+        videoFeed.src = `/video_feed?url=${encodeURIComponent(videoPath)}&t=${new Date().getTime()}`;
+    } else {
+        videoFeed.src = "";
+    }
+}
+
+async function checkBackendStatus() {
+    try {
+        const response = await fetch('/status');
+        const data = await response.json();
+        document.getElementById('backendStatus').textContent = data.status;
+    } catch (error) {
+        document.getElementById('backendStatus').textContent = 'Error';
+    }
+}
+
+window.addEventListener('load', () => {
+    // Load settings on page load if you want to pre-populate or check status
+    // loadSettings(); 
+    
+    // Check backend status periodically
+    setInterval(checkBackendStatus, 5000);
+
+    const videoWrapper = document.querySelector('.video-preview-wrapper');
+    const videoFeed = document.getElementById('videoFeed');
+
+    if (videoWrapper && videoFeed) {
+        videoWrapper.addEventListener('dblclick', () => {
+            if (!videoWrapper.classList.contains('fullscreen')) {
+                // Enter fullscreen on double-click
+                videoWrapper.classList.add('fullscreen');
+            } else {
+                // Exit fullscreen on double-click
+                videoWrapper.classList.remove('fullscreen');
+                updateVideoStream(); // Resume stream with new timestamp
+            }
+        });
+    }
+});
+
+function updateVideoStream() {
+    const videoPath = document.getElementById('video_path').value;
+    const videoFeed = document.getElementById('videoFeed');
+    if (videoPath) {
+        videoFeed.src = `/video_feed?url=${encodeURIComponent(videoPath)}&t=${new Date().getTime()}`;
+    } else {
+        videoFeed.src = "";
+    }
+}
+// #endregion
