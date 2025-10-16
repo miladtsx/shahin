@@ -21,7 +21,7 @@ def random_plate():
 def insert_fake_plates(db):
     for vid in range(1, 1001):
         plate_text = random_plate()
-        db.insert_plate(vid, None, plate_text)
+        db.insert_plate(vid, plate_text)
 
 
 if __name__ == "__main__":

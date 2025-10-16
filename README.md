@@ -70,5 +70,36 @@ After the stack starts:
 
 Promtail is configured to read `./logs/*.jsonl` and push to Loki. Use the provided `docker/promtail-config.yaml` if you need to tweak parsing or labels.
 
+## DB Schema
+
+```sql
+-- from traffic → plate → metadata
+
+CREATE TABLE IF NOT EXISTS plates (
+    uuid TEXT PRIMARY KEY,
+    plate_text TEXT NOT NULL UNIQUE,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS metadata (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plate_uuid TEXT NOT NULL UNIQUE,
+    car_type TEXT,
+    car_color TEXT,
+    driver_name TEXT,
+    FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
+);
+
+CREATE TABLE IF NOT EXISTS traffic (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plate_uuid TEXT NOT NULL,
+    location TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
+);
+
+```
+
+
 ## Document
 [link](https://docs.google.com/document/d/1_Q-legmeUw9Q5sP0G9K7ayoIYyhgSnebhKUnHNxscoQ/edit?tab=t.0#heading=h.z6ne0og04bp5)

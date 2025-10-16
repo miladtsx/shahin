@@ -1,6 +1,7 @@
 from io import StringIO
 import os, sys
 import sqlite3
+import uuid
 import webbrowser
 import yaml
 import subprocess
@@ -53,34 +54,35 @@ def serve_out_files(vid, tag):
 def list_plates():
     # pagination
     try:
-        per_page = int(request.args.get("per_page", 5))
+        per_page = max(1, min(int(request.args.get("per_page", 5)), 200))
+        page = max(1, int(request.args.get("page", 1)))
     except ValueError:
-        per_page = 5
-    per_page = max(1, min(per_page, 200))  # clamp 1..200
-    try:
-        page = int(request.args.get("page", 1))
-    except ValueError:
-        page = 1
-    page = max(1, page)
+        per_page, page = 5, 1
     offset = (page - 1) * per_page
 
     plate_text = request.args.get("plate_text", "").strip()
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
 
-    query = "SELECT id, vehicle_id, plate_text, car_type, car_color, timestamp FROM plates WHERE 1=1"
+    query = """ \
+        SELECT p.uuid, p.plate_text, p.timestamp, 
+            m.car_type, m.car_color, m.driver_name 
+        FROM plates p
+        LEFT JOIN metadata m ON p.uuid = m.plate_uuid
+        WHERE 1=1
+    """
     params = []
     if plate_text:
-        query += " AND plate_text LIKE ?"
+        query += " AND p.plate_text LIKE ?"
         params.append(f"%{plate_text}%")
     if start_ts:
-        query += " AND timestamp >= ?"
+        query += " AND p.timestamp >= ?"
         params.append(start_ts)
     if end_ts:
-        query += " AND timestamp <= ?"
+        query += " AND p.timestamp <= ?"
         params.append(end_ts)
 
-    query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+    query += " ORDER BY p.timestamp DESC LIMIT ? OFFSET ?"
     params.extend([per_page, offset])
 
     with get_conn() as conn:
@@ -89,32 +91,31 @@ def list_plates():
         rows = cur.fetchall()
 
         # total count for pagination
-        count_q = "SELECT COUNT(*) FROM plates WHERE 1=1"
-        count_params = []
-        if plate_text:
-            count_q += " AND plate_text LIKE ?"
-            count_params.append(f"%{plate_text}%")
-        if start_ts:
-            count_q += " AND timestamp >= ?"
-            count_params.append(start_ts)
-        if end_ts:
-            count_q += " AND timestamp <= ?"
-            count_params.append(end_ts)
-        cur.execute(count_q, count_params)
+        count_q = "SELECT COUNT(*) FROM plates"
         total = cur.fetchone()[0]
 
-        print(rows)
+        count_params = []
+        if plate_text:
+            count_q += " AND p.plate_text LIKE ?"
+            count_params.append(f"%{plate_text}%")
+        if start_ts:
+            count_q += " AND p.timestamp >= ?"
+            count_params.append(start_ts)
+        if end_ts:
+            count_q += " AND p.timestamp <= ?"
+            count_params.append(end_ts)
+        cur.execute(count_q, count_params)
 
     return jsonify(
         {
             "items": [
                 {
-                    "id": r[0],
-                    "vehicle_id": r[1],
-                    "plate_text": r[2],
+                    "uuid": r[0],
+                    "plate_text": r[1],
+                    "timestamp": r[2],
                     "car_type": r[3],
                     "car_color": r[4],
-                    "timestamp": r[5],
+                    "driver_name": r[5],
                 }
                 for r in rows
             ],
@@ -126,36 +127,45 @@ def list_plates():
 @app.route("/plates", methods=["POST"])
 def create_plate():
     data = request.json
+    plate_uuid = str(uuid.uuid4())
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO plates (vehicle_id, plate_text, car_type, car_color) VALUES (?, ?, ?, ?)",
+            "INSERT INTO plates (uuid, plate_text) VALUES (?, ?)",
             (
-                data["vehicle_id"],
+                plate_uuid,
                 data["plate_text"],
+            ),
+        )
+        conn.execute(
+            "INSERT INTO metadata (plate_uuid, car_type, car_color, driver_name) VALUES (?, ?, ?, ?)",
+            (
+                plate_uuid,
                 data["car_type"],
                 data["car_color"],
+                data["driver_name"],
             ),
         )
         conn.commit()
-    return jsonify({"status": "created"})
+    return jsonify({"status": "created", "uuid": plate_uuid})
 
 
-@app.route("/plates/<int:pid>", methods=["PUT"])
-def update_plate(pid):
+@app.route("/plates/<int:plate_uuid>", methods=["PUT"])
+def update_plate(plate_uuid):
     data = request.json
     with get_conn() as conn:
         conn.execute(
-            "UPDATE plates SET plate_text = ? WHERE id = ?",
-            (data["plate_text"], pid),
+            "UPDATE plates SET car_type=?, car_color=?, driver_name=? WHERE uuid = ?",
+            (data["car_type"], data["car_color"], data["driver_name"], str(plate_uuid)),
         )
         conn.commit()
     return jsonify({"status": "updated"})
 
 
-@app.route("/plates/<int:pid>", methods=["DELETE"])
-def delete_plate(pid):
+@app.route("/plates/<int:plate_uuid>", methods=["DELETE"])
+def delete_plate(plate_uuid):
     with get_conn() as conn:
-        conn.execute("DELETE FROM plates WHERE id = ?", (pid,))
+        conn.execute("DELETE FROM metadata WHERE plate_uuid = ?", (str(plate_uuid),))
+        conn.execute("DELETE FROM plates WHERE uuid = ?", (str(plate_uuid),))
         conn.commit()
         # TODO delete the image file from disk as well.
     return jsonify({"status": "deleted"})
@@ -300,13 +310,27 @@ if __name__ == "__main__":
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS plates (
+                    uuid TEXT PRIMARY KEY,
+                    plate_text TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS metadata (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    vehicle_id TEXT,
-                    plate_text TEXT,
+                    plate_uuid TEXT NOT NULL UNIQUE,
                     car_type TEXT,
                     car_color TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
+                    driver_name TEXT,
+                    FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
+                );
+
+                CREATE TABLE IF NOT EXISTS traffic (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    plate_uuid TEXT NOT NULL,
+                    location TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
+                );
                 """
             )
             conn.commit()

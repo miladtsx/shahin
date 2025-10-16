@@ -20,13 +20,33 @@ class DB:
         cur.execute(
             """
                 CREATE TABLE IF NOT EXISTS plates (
+                    uuid TEXT PRIMARY KEY,
+                    plate_text TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+            """
+        )
+        cur.execute(
+            """
+                CREATE TABLE IF NOT EXISTS metadata (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    vehicle_id TEXT,
-                    plate_text TEXT,
+                    plate_uuid TEXT NOT NULL UNIQUE,
                     car_type TEXT,
                     car_color TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
+                    driver_name TEXT,
+                    FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
+                );
+            """
+        )
+        cur.execute(
+            """
+                CREATE TABLE IF NOT EXISTS traffic (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    plate_uuid TEXT NOT NULL,
+                    location TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
+                );
             """
         )
         self._conn.commit()
@@ -36,29 +56,48 @@ class DB:
         self._conn.close()
         logger.info("db_stopped")
 
-    def insert_plate(self, vid: int, plate_text: str):
-        # Validate input
-        if (
-            not isinstance(vid, int)
-            or vid < 1
-            or vid > 2**31 - 1
-            or not isinstance(plate_text, str)
-            or len(plate_text) < 7
-        ):
-            logger.exception(
-                "Invalid input types",
-                extra={
-                    "vehicle_id": vid,
-                    "plate_text": plate_text,
-                },
-            )
-            raise ValueError("Invalid input types")
-
+    def insert_plate(
+        self, vehicle_id: str, plate_text: str, location=None, metadata=None
+    ):
         try:
             cur = self._conn.cursor()
+            plate_uuid = vehicle_id
+
+            if plate_text != 'DETECTION_FAILED':
+                # ensure plate exists
+                cur.execute("SELECT uuid FROM plates WHERE plate_text = ?", (plate_text,))
+                row = cur.fetchone()
+                if row:
+                    plate_uuid = row[0]
+            else:
+                cur.execute(
+                    "INSERT INTO plates (uuid, plate_text) VALUES (?, ?)",
+                    (plate_uuid, plate_text),
+                )
+
+            # optionally insert/update metadata
+            if metadata:
+                cur.execute(
+                    """
+                    INSERT INTO metadata (plate_uuid, car_type, car_color, driver_name)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(plate_uuid) DO UPDATE SET
+                        car_type=excluded.car_type,
+                        car_color=excluded.car_color,
+                        driver_name=excluded.driver_name
+                """,
+                    (
+                        plate_uuid,
+                        metadata.get("car_type"),
+                        metadata.get("car_color"),
+                        metadata.get("driver_name"),
+                    ),
+                )
+
+            # insert traffic record
             cur.execute(
-                "INSERT INTO plates (vehicle_id, plate_text) VALUES (?, ?)",
-                (str(vid), plate_text),
+                "INSERT INTO traffic (plate_uuid, location) VALUES (?, ?)",
+                (plate_uuid, location),
             )
             self._conn.commit()
         except Exception as e:

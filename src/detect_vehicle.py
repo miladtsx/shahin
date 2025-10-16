@@ -11,7 +11,6 @@ from src.common_utils.config import Config
 from src.common_utils.app_logger import get_logger, log_duration
 from concurrent.futures import ThreadPoolExecutor
 from src.common_utils.resource_path import get_resource_path, get_data_path
-from src.common_utils.image_save import save
 from src.common_utils.debug_image import show
 
 logger = get_logger("detect", logfile="logs/app.jsonl")
@@ -36,7 +35,7 @@ def run_plate_detection():
     detector_plate = PlateDetector(
         get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
     )
-    tracker = Sort()
+    tracker = Sort(max_age=120 * 5, min_hits=10, iou_threshold=0.7)
     selector = OnlineBestFrameSelector(
         score_quality,
         no_improve_patience=conf.get("no_improve_patience", 20),
@@ -59,13 +58,15 @@ def run_plate_detection():
             frame_count = 0
             original_frame = None
 
+            frame_skip = max(conf.get("frame_skip", 1), 1)  # always ≥1
+
             logger.info("Starting video processing...")
             for frame in loader:
                 if not frame.any() or frame.mean() < 5:  # near black
                     logger.warning("Black frame detected, camera may be dead")
                     continue
                 frame_count += 1
-                if frame_count % conf.get("frame_skip", 1) != 0:
+                if frame_count % frame_skip != 0:
                     continue
 
                 # 1. Detect vehicles
@@ -90,7 +91,11 @@ def run_plate_detection():
                         for trk in tracked
                     ]
                     # Update tracker IDs to UUIDs
-                    tracked_vehicles = [detector_vehicle.get_uuid(v) for v in tracked_vehicles]
+                    tracked_vehicles = [
+                        detector_vehicle.get_uuid(v) for v in tracked_vehicles
+                    ]
+                    active_boxes = {trk["id"]: trk["bbox"] for trk in tracked_vehicles}
+
                 except Exception as e:
                     logger.error(f"Vehicle tracking failed at frame {frame_count}: {e}")
                     continue
@@ -104,7 +109,7 @@ def run_plate_detection():
                 for trk in tracked_vehicles:
                     vid = trk["id"]
                     active_ids.add(vid)
-                    selector.mark_seen(vid, frame_count, original_frame=frame)
+                    selector.mark_seen(vid, frame_count, frame)
                     x1, y1, x2, y2 = trk["bbox"]
                     car_crop = frame[y1:y2, x1:x2]
                     original_frame = frame
@@ -143,7 +148,7 @@ def run_plate_detection():
                             plate_crop = vh_crop[py1:py2, px1:px2]
                             if plate_crop.size == 0:
                                 continue
-                            show(plate_crop, "Plate")
+                            # show(plate_crop, "Plate")
 
                             pw, ph = px2 - px1, py2 - py1
                             if pw * ph < int(conf.get("crop_dimension_threshold", 0)):
@@ -153,7 +158,10 @@ def run_plate_detection():
                                 continue
 
                             # Let OnlineBestFrameSelector handle quality evaluation
-                            selector.update(vid, plate_crop, frame_count, original_frame=frame)
+                            selector.update(
+                                vid, plate_crop, frame_count, original_frame=frame,
+                                bbox=trk["bbox"]
+                            )
                         except Exception as e:
                             logger.error(
                                 f"Error processing plate for vehicle {vid}: {e}"
@@ -162,10 +170,13 @@ def run_plate_detection():
 
                 # 6. Finalize tracks once per frame
                 try:
-                    to_finalize = selector.step_end(active_ids, frame_count)
+                    to_finalize = selector.step_end(
+                        active_ids, frame_count, active_boxes=active_boxes
+                    )
                     if len(to_finalize):
                         for vid in to_finalize:
-                            executor.submit(selector.finalize, db, vid)
+                            # executor.submit(selector.finalize, db, vid)
+                            selector.finalize(db, vid)
                 except Exception as e:
                     logger.error(
                         f"Track finalization failed at frame {frame_count}: {e}"
@@ -206,7 +217,7 @@ def draw_boxes(frame, detections, color=(0, 255, 0), label="obj"):
         x1, y1, x2, y2 = map(int, det["bbox"])
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
-        txt = f"{det['id']}"
+        txt = f"{det['id'][:8]}"
         if "conf" in det:
             txt += f" {det['conf']:.2f}"
 

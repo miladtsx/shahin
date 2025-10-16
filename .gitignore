@@ -26,3 +26,4 @@ runs/
 logs/app.jsonl
 frontend/build
 frontend/app.spec
+logs/
