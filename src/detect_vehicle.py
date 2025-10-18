@@ -158,7 +158,7 @@ def run_plate_detection():
                             # Let OnlineBestFrameSelector handle quality evaluation
                             selector.update(
                                 vid, plate_crop, frame_count, original_frame=frame,
-                                bbox=trk["bbox"]
+                                bbox=trk.get("bbox")
                             )
                         except Exception as e:
                             logger.error(
