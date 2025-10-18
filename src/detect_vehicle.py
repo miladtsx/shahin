@@ -56,7 +56,6 @@ def run_plate_detection():
             )
 
             frame_count = 0
-            original_frame = None
 
             frame_skip = max(conf.get("frame_skip", 1), 1)  # always ≥1
 
@@ -112,7 +111,6 @@ def run_plate_detection():
                     selector.mark_seen(vid, frame_count, frame)
                     x1, y1, x2, y2 = trk["bbox"]
                     car_crop = frame[y1:y2, x1:x2]
-                    original_frame = frame
                     if car_crop.size > 0:
                         vehicle_crops.append(car_crop)
                         vehicle_ids.append(vid)
