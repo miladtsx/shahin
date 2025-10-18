@@ -61,8 +61,8 @@ class OnlineBestFrameSelector:
 
         # 2. Update fully visible frame if applicable
         if bbox is not None and self.is_fully_visible(bbox, original_frame.shape):
-            prev_vis_score = self.best_visible_frame.get(vid, (float("-inf"),))[0]
-            if score > prev_vis_score:
+            prev_vid_score = self.best_visible_frame.get(vid, (float("-inf"),))[0]
+            if score > prev_vid_score:
                 self.best_visible_frame[vid] = (
                     score,
                     crop.copy(),
