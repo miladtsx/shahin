@@ -92,8 +92,6 @@ def list_plates():
 
         # total count for pagination
         count_q = "SELECT COUNT(*) FROM plates"
-        total = cur.fetchone()[0]
-
         count_params = []
         if plate_text:
             count_q += " AND p.plate_text LIKE ?"
@@ -119,7 +117,7 @@ def list_plates():
                 }
                 for r in rows
             ],
-            "meta": {"page": page, "per_page": per_page, "total": total},
+            "meta": {"page": page, "per_page": per_page, "total": len(rows)},
         }
     )
 
