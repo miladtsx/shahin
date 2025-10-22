@@ -41,8 +41,23 @@ def index():
     return render_template("static/dashboard.html")
 
 
-@app.route("/plate_image/<int:vid>/<string:tag>")
-def serve_out_files(vid, tag):
+@app.route("/plate_image/<string:uuid>/<string:tag>")
+def serve_out_files(uuid, tag):
+    """
+    Generic api to help the dashboard load images from disk
+    """
+    base_dir = get_data_path(f"out/{uuid}")
+    paths = [f"{tag}.jpg", "failed_capture.jpg"]
+    for p in paths:
+        full_path = os.path.join(base_dir, p)
+        if os.path.exists(full_path):
+            return send_from_directory(base_dir, p)
+
+    return "", 404
+
+
+@app.route("/tiny_plate_image/<string:uuid>/<string:tag>")
+def serve_out_tiny_plate(uuid, tag):
     """
     Generic api to help the dashboard load images from disk
     """

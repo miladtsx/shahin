@@ -39,18 +39,8 @@ async function fetchPlates(query = "") {
   data.forEach((p) => {
     const tr = document.createElement("tr");
 
-    // ID cell
-    const idTd = document.createElement("td");
-    idTd.textContent = toFarsiNumber(p.id);
-    tr.appendChild(idTd);
-
-    // VID cell
-    // const vidTd = document.createElement("td");
-    // vidTd.textContent = p.vehicle_id;
-    // tr.appendChild(vidTd);
-
     const imgTd = document.createElement("td");
-    imgTd.innerHTML = `<img src="/plate_image/${p.vehicle_id}/best" 
+    imgTd.innerHTML = `<img src="/tiny_plate_image/${p.uuid}/best" 
     onclick='openPlateImageModal("/plate_image/${
       p.uuid
     }/original", ${JSON.stringify(p).replace(/"/g, "&quot;")})'>`;
@@ -113,11 +103,6 @@ function changePage(delta) {
 
 function openPlateImageModal(src, plateData) {
   document.getElementById("modalLargeImg").src = src;
-
-  // const tr = document.createElement("tr");
-  // const plateTd = document.createElement("td");
-  // plateTd.appendChild(createPlateComponent(p.plate_text, p.id));
-  // tr.appendChild(plateTd);
 
   const detailsDiv = document.getElementById("modalDetails");
   detailsDiv.innerHTML = `
