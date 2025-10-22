@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS metadata (
     plate_uuid TEXT NOT NULL UNIQUE,
     car_type TEXT,
     car_color TEXT,
-    driver_name TEXT,
+    car_owner TEXT,
     FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
 );
 
