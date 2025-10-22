@@ -473,6 +473,8 @@ function updateVideoStream() {
 }
 
 async function checkBackendStatus() {
+  return;
+  // TODO POST MVP
   try {
     const response = await fetch("/status");
     const data = await response.json();
