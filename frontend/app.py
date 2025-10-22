@@ -46,7 +46,7 @@ def serve_out_files(vid, tag):
     """
     Generic api to help the dashboard load images from disk
     """
-    base_dir = get_data_path(f"out/{vid}")
+    base_dir = get_data_path(f"out/{uuid}")
     return send_from_directory(base_dir, f"{tag}.jpg")
 
 
@@ -66,7 +66,7 @@ def list_plates():
 
     query = """ \
         SELECT p.uuid, p.plate_text, p.timestamp, 
-            m.car_type, m.car_color, m.driver_name 
+            m.car_type, m.car_color, m.car_owner 
         FROM plates p
         LEFT JOIN metadata m ON p.uuid = m.plate_uuid
         WHERE 1=1
@@ -91,7 +91,12 @@ def list_plates():
         rows = cur.fetchall()
 
         # total count for pagination
-        count_q = "SELECT COUNT(*) FROM plates"
+        count_q = """
+            SELECT COUNT(*)
+            FROM plates p
+            LEFT JOIN metadata m ON p.uuid = m.plate_uuid
+            WHERE 1=1
+        """
         count_params = []
         if plate_text:
             count_q += " AND p.plate_text LIKE ?"
@@ -103,6 +108,7 @@ def list_plates():
             count_q += " AND p.timestamp <= ?"
             count_params.append(end_ts)
         cur.execute(count_q, count_params)
+        total = cur.fetchone()[0]
 
     return jsonify(
         {
@@ -113,11 +119,11 @@ def list_plates():
                     "timestamp": r[2],
                     "car_type": r[3],
                     "car_color": r[4],
-                    "driver_name": r[5],
+                    "car_owner": r[5],
                 }
                 for r in rows
             ],
-            "meta": {"page": page, "per_page": per_page, "total": len(rows)},
+            "meta": {"page": page, "per_page": per_page, "total": total},
         }
     )
 
@@ -135,31 +141,46 @@ def create_plate():
             ),
         )
         conn.execute(
-            "INSERT INTO metadata (plate_uuid, car_type, car_color, driver_name) VALUES (?, ?, ?, ?)",
+            "INSERT INTO metadata (plate_uuid, car_type, car_color, car_owner) VALUES (?, ?, ?, ?)",
             (
                 plate_uuid,
                 data["car_type"],
                 data["car_color"],
-                data["driver_name"],
+                data["car_owner"],
             ),
         )
         conn.commit()
     return jsonify({"status": "created", "uuid": plate_uuid})
 
 
-@app.route("/plates/<int:plate_uuid>", methods=["PUT"])
+@app.route("/plates/<string:plate_uuid>", methods=["PUT"])
 def update_plate(plate_uuid):
-    data = request.json
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE plates SET car_type=?, car_color=?, driver_name=? WHERE uuid = ?",
-            (data["car_type"], data["car_color"], data["driver_name"], str(plate_uuid)),
-        )
-        conn.commit()
+    try:
+        data = request.json
+        with get_conn() as conn:
+            conn.execute(
+                """
+                    INSERT INTO metadata (plate_uuid, car_type, car_color, car_owner)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(plate_uuid) DO UPDATE SET
+                        car_type=excluded.car_type,
+                        car_color=excluded.car_color,
+                        car_owner=excluded.car_owner
+                """,
+                (
+                    plate_uuid,
+                    data.get("car_type"),
+                    data.get("car_color"),
+                    data.get("car_owner"),
+                ),
+            )
+            conn.commit()
+    except Exception as e:
+        return jsonify({"status": f"Error: {str(e)}"})
     return jsonify({"status": "updated"})
 
 
-@app.route("/plates/<int:plate_uuid>", methods=["DELETE"])
+@app.route("/plates/<string:plate_uuid>", methods=["DELETE"])
 def delete_plate(plate_uuid):
     with get_conn() as conn:
         conn.execute("DELETE FROM metadata WHERE plate_uuid = ?", (str(plate_uuid),))
@@ -305,30 +326,37 @@ if __name__ == "__main__":
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     if not os.path.exists(db_path):
         with sqlite3.connect(db_path) as conn:
-            conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
-                CREATE TABLE IF NOT EXISTS plates (
-                    uuid TEXT PRIMARY KEY,
-                    plate_text TEXT NOT NULL,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS metadata (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    plate_uuid TEXT NOT NULL UNIQUE,
-                    car_type TEXT,
-                    car_color TEXT,
-                    driver_name TEXT,
-                    FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
-                );
-
-                CREATE TABLE IF NOT EXISTS traffic (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    plate_uuid TEXT NOT NULL,
-                    location TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
-                );
+                    CREATE TABLE IF NOT EXISTS plates (
+                        uuid TEXT PRIMARY KEY,
+                        plate_text TEXT NOT NULL,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    );
+                """
+            )
+            cur.execute(
+                """
+                    CREATE TABLE IF NOT EXISTS metadata (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        plate_uuid TEXT NOT NULL UNIQUE,
+                        car_type TEXT,
+                        car_color TEXT,
+                        car_owner TEXT,
+                        FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
+                    );
+                """
+            )
+            cur.execute(
+                """
+                    CREATE TABLE IF NOT EXISTS traffic (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        plate_uuid TEXT NOT NULL,
+                        location TEXT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
+                    );
                 """
             )
             conn.commit()

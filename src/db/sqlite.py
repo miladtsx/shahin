@@ -33,7 +33,7 @@ class DB:
                     plate_uuid TEXT NOT NULL UNIQUE,
                     car_type TEXT,
                     car_color TEXT,
-                    driver_name TEXT,
+                    car_owner TEXT,
                     FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
                 );
             """
@@ -63,9 +63,11 @@ class DB:
             cur = self._conn.cursor()
             plate_uuid = vehicle_id
 
-            if plate_text != 'DETECTION_FAILED':
+            if plate_text != "DETECTION_FAILED":
                 # ensure plate exists
-                cur.execute("SELECT uuid FROM plates WHERE plate_text = ?", (plate_text,))
+                cur.execute(
+                    "SELECT uuid FROM plates WHERE plate_text = ?", (plate_text,)
+                )
                 row = cur.fetchone()
                 if row:
                     plate_uuid = row[0]
@@ -79,18 +81,18 @@ class DB:
             if metadata:
                 cur.execute(
                     """
-                    INSERT INTO metadata (plate_uuid, car_type, car_color, driver_name)
+                    INSERT INTO metadata (plate_uuid, car_type, car_color, car_owner)
                     VALUES (?, ?, ?, ?)
                     ON CONFLICT(plate_uuid) DO UPDATE SET
                         car_type=excluded.car_type,
                         car_color=excluded.car_color,
-                        driver_name=excluded.driver_name
+                        car_owner=excluded.car_owner
                 """,
                     (
                         plate_uuid,
                         metadata.get("car_type"),
                         metadata.get("car_color"),
-                        metadata.get("driver_name"),
+                        metadata.get("car_owner"),
                     ),
                 )
 

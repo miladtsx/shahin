@@ -52,13 +52,13 @@ async function fetchPlates(query = "") {
     const imgTd = document.createElement("td");
     imgTd.innerHTML = `<img src="/plate_image/${p.vehicle_id}/best" 
     onclick='openPlateImageModal("/plate_image/${
-      p.vehicle_id
+      p.uuid
     }/original", ${JSON.stringify(p).replace(/"/g, "&quot;")})'>`;
     tr.appendChild(imgTd);
 
     // Plate glyphs cell
     const plateTd = document.createElement("td");
-    plateTd.appendChild(createPlateComponent(p.plate_text, p.id));
+    plateTd.appendChild(createPlateComponent(p.plate_text, p.uuid));
     tr.appendChild(plateTd);
 
     // Timestamp cell
@@ -83,7 +83,7 @@ async function fetchPlates(query = "") {
     actTd.className = "actions";
     actTd.innerHTML = `
     <div class="action-buttons">
-      <button class="button btn-delete" onclick="deletePlate(${p.id})">حذف</button>
+      <button class="button btn-delete" onclick="deletePlate('${p.uuid}')">حذف</button>
     </div>
     `;
     tr.appendChild(actTd);
@@ -121,26 +121,16 @@ function openPlateImageModal(src, plateData) {
 
   const detailsDiv = document.getElementById("modalDetails");
   detailsDiv.innerHTML = `
-    <p>شناسه: ${toFarsiNumber(plateData.id)}</p>
-    <p>نام فایل: ${plateData.vehicle_id}</p>
+    <p>شناسه: ${plateData.uuid}</p>
     <div class="plateTextModalContainer">
-    <p><strong>شماره پلاک:</strong> <input class="center-text" id="editPlateText" value="${
-      plateData.plate_text
-    }"></p>
-    <p><strong>بدنه خودرو:</strong> <input class="center-text" id="editCarType" value="${
-      plateData.car_type
-    }"></p>
-  <p><strong>رنگ خودرو:</strong> <input class="center-text" id="editCarColor" value="${
-    plateData.car_color
-  }"></p>
+    <p><strong>شماره پلاک:</strong> <input class="center-text" id="editPlateText" value="${plateData.plate_text}"></p>
+    <p><strong>بدنه خودرو:</strong> <input class="center-text" id="editCarType" value="${plateData.car_type}"></p>
+  <p><strong>رنگ خودرو:</strong> <input class="center-text" id="editCarColor" value="${plateData.car_color}"></p>
+  <p><strong>صاحب خودرو:</strong> <input class="center-text" id="editCarOwner" value="${plateData.car_owner}"></p>
     </div>
     <div class="modal-actions">
-      <button class="button new-plate" onclick="confirmUpdatePlate(${
-        plateData.id
-      })">بروزرسانی</button>
-      <button class="button btn-delete" onclick="confirmDeletePlate(${
-        plateData.id
-      })">حذف</button>
+      <button class="button new-plate" onclick="confirmUpdatePlate('${plateData.uuid}')">بروزرسانی</button>
+      <button class="button btn-delete" onclick="confirmDeletePlate('${plateData.uuid}')">حذف</button>
     </div>
   `;
 
@@ -168,33 +158,32 @@ function showConfirm(message, onConfirm) {
 }
 
 // Update Plate with Confirmation
-function confirmUpdatePlate(id) {
-  showConfirm(
-    `آیا از بروزرسانی پلاک ${toFarsiNumber(id)} مطمئنید؟`,
-    async () => {
-      const newPlate = document.getElementById("editPlateText").value;
-      const newCarType = document.getElementById("editCarType").value;
-      const newCarColor = document.getElementById("editCarColor").value;
-      await fetch(`/plates/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          plate_text: newPlate,
-          car_type: newCarType,
-          car_color: newCarColor
-         }),
-      });
-      showToast("پلاک بروزرسانی شد");
-      fetchPlates();
-      closePlateImageModal();
-    }
-  );
+function confirmUpdatePlate(uuid) {
+  showConfirm(`آیا بروزرسانی شود؟`, async () => {
+    const newPlate = document.getElementById("editPlateText").value;
+    const newCarType = document.getElementById("editCarType").value;
+    const newCarColor = document.getElementById("editCarColor").value;
+    const newCarOwner = document.getElementById("editCarOwner").value;
+    await fetch(`/plates/${uuid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        plate_text: newPlate,
+        car_type: newCarType,
+        car_color: newCarColor,
+        car_owner: newCarOwner,
+      }),
+    });
+    showToast("پلاک بروزرسانی شد");
+    fetchPlates();
+    closePlateImageModal();
+  });
 }
 
 // Delete Plate with Confirmation
-function confirmDeletePlate(id) {
-  showConfirm(`آیا از حذف پلاک ${toFarsiNumber(id)} مطمئنید؟`, async () => {
-    await fetch(`/plates/${id}`, { method: "DELETE" });
+function confirmDeletePlate(uuid) {
+  showConfirm(`آیا از حذف پلاک ${uuid} مطمئنید؟`, async () => {
+    await fetch(`/plates/${uuid}`, { method: "DELETE" });
     showToast("پلاک حذف شد");
     fetchPlates();
     closePlateImageModal();
@@ -209,7 +198,6 @@ async function addPlate() {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      vehicle_id: 0,
       plate_text: plate,
     }),
   });
@@ -218,15 +206,15 @@ async function addPlate() {
   showToast("پلاک جدید اضافه شد", 5000);
 }
 
-async function updatePlate(id, inputElem) {
+async function updatePlate(uuid, inputElem) {
   const tr = inputElem.closest("tr");
   const updated = {
     plate_text: tr.children[3].children[0].value,
   };
   // if (!confirm(`Update record ${id}?`)) return;
   showConfirm(
-    `آیا از بروزرسانی پلاک ${toFarsiNumber(id)} مطمئنید؟`,
-    await fetch(`/plates/${id}`, {
+    `آیا از بروزرسانی پلاک ${uuid} مطمئنید؟`,
+    await fetch(`/plates/${uuid}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updated),
@@ -261,9 +249,9 @@ function restoreInputs() {
 }
 // add new plate modal
 
-async function deletePlate(id) {
-  showConfirm(`پلاک ${id} برای همیشه حذف شود؟ مطمئنید؟`, async () => {
-    await fetch(`/plates/${id}`, { method: "DELETE" });
+async function deletePlate(uuid) {
+  showConfirm(`پلاک ${uuid} برای همیشه حذف شود؟ مطمئنید؟`, async () => {
+    await fetch(`/plates/${uuid}`, { method: "DELETE" });
     fetchPlates();
     showToast("پلاک حذف شد", 5000);
   });
@@ -289,12 +277,14 @@ function closeAddPlateModal() {
   document.getElementById("modal_plate_text").value = "";
   document.getElementById("modal_car_type").value = "";
   document.getElementById("modal_car_color").value = "";
+  document.getElementById("modal_car_owner").value = "";
 }
 
 async function submitAddPlate() {
   const plate = document.getElementById("modal_plate_text").value;
   const carType = document.getElementById("modal_car_type").value;
   const carColor = document.getElementById("modal_car_color").value;
+  const carOwner = document.getElementById("modal_car_owner").value;
   if (plate.length < 7) return showToast("پلاک ۸ رقم دارد", 2000);
 
   try {
@@ -302,10 +292,10 @@ async function submitAddPlate() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        vehicle_id: 0,
         plate_text: plate,
         car_type: carType,
         car_color: carColor,
+        car_owner: carOwner,
       }),
     });
     const data = await res.json();
