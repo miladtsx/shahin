@@ -8,6 +8,8 @@ from src.common_utils.image_save import save
 from src.common_utils.debug_image import show
 
 logger = get_logger("best_frame_selector", logfile="logs/app.jsonl")
+# @dev for easier visual debugging
+LOG_UUID_FRACTION = 3
 
 
 class OnlineBestFrameSelector:
@@ -59,7 +61,7 @@ class OnlineBestFrameSelector:
                 original_frame.copy(),
             )
             logger.debug(
-                f"[Vehicle {vid[:8]}] New sharpest frame {score:.2f} at {frame_idx}"
+                f"[Vehicle {vid[:LOG_UUID_FRACTION]}] New sharpest frame {score:.2f} at {frame_idx}"
             )
 
         # 2. Update fully visible frame if applicable
@@ -73,7 +75,7 @@ class OnlineBestFrameSelector:
                     original_frame.copy(),
                 )
                 logger.debug(
-                    f"[Vehicle {vid[:8]}] New fully visible frame {score:.2f} at {frame_idx}"
+                    f"[Vehicle {vid[:LOG_UUID_FRACTION]}] New fully visible frame {score:.2f} at {frame_idx}"
                 )
 
         return score
@@ -151,7 +153,9 @@ class OnlineBestFrameSelector:
         This is where OCR and database insertion happens.
         """
         if vid in self.finalized:
-            logger.debug(f"[Vehicle {vid[:8]}] Already finalized, skipping.")
+            logger.debug(
+                f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Already finalized, skipping."
+            )
             return
         self.finalized.add(vid)
 
@@ -162,7 +166,7 @@ class OnlineBestFrameSelector:
             last_frame = self.last_known_frame.get(vid)
             if last_frame is not None:
                 logger.info(
-                    f"[Vehicle {vid[:8]}] Saving last known frame for manual review."
+                    f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Saving last known frame for manual review."
                 )
                 save(last_frame, vid, "failed_capture")
                 try:
@@ -170,11 +174,11 @@ class OnlineBestFrameSelector:
                     db.insert_plate(vid, "DETECTION_FAILED")
                 except Exception as e:
                     logger.error(
-                        f"[Vehicle {vid[:8]}] DB insert failed for failed capture: {e}"
+                        f"[Vehicle {vid[:LOG_UUID_FRACTION]}] DB insert failed for failed capture: {e}"
                     )
             else:
                 logger.error(
-                    f"[Vehicle {vid[:8]}] No frame available to save for failed capture."
+                    f"[Vehicle {vid[:LOG_UUID_FRACTION]}] No frame available to save for failed capture."
                 )
 
             self.cleanup(vid)
@@ -182,7 +186,7 @@ class OnlineBestFrameSelector:
 
         score, crop, frame_idx, original_frame = best_frame_data
         logger.info(
-            f"[Vehicle {vid[:8]}] Finalizing with best frame from index {frame_idx} (score: {score:.2f})."
+            f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Finalizing with best frame from index {frame_idx} (score: {score:.2f})."
         )
         save(original_frame, vid, "original_final")
         save(crop, vid, "plate_final")
@@ -193,7 +197,7 @@ class OnlineBestFrameSelector:
             glyphs = self.segmentation.segment(preprocessed, vid)
             if not glyphs:
                 logger.warning(
-                    f"[Vehicle {vid[:8]}] Segmentation failed, no glyphs found."
+                    f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Segmentation failed, no glyphs found."
                 )
                 self.cleanup(vid)
                 return
@@ -211,17 +215,18 @@ class OnlineBestFrameSelector:
             plate_text = "".join(final_plate_text).strip()
             if not plate_text:
                 logger.warning(
-                    f"[Vehicle {vid[:8]}] OCR resulted in an empty plate text."
+                    f"[Vehicle {vid[:LOG_UUID_FRACTION]}] OCR resulted in an empty plate text."
                 )
                 self.cleanup(vid)
                 return
 
-            # logger.info(f"[Vehicle {vid[:8]}] Final plate: {plate_text}")
+            # logger.info(f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Final plate: {plate_text}")
             db.insert_plate(vid, plate_text)
 
         except Exception as e:
             logger.error(
-                f"[Vehicle {vid[:8]}] Final processing failed: {e}", exc_info=True
+                f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Final processing failed: {e}",
+                exc_info=True,
             )
         finally:
             # Ensure cleanup happens even if processing fails
@@ -237,7 +242,7 @@ class OnlineBestFrameSelector:
         self.last_known_box.pop(vid, None)
         self.lost_boxes.pop(vid, None)
         # self.finalized.discard(vid)
-        logger.debug(f"[Vehicle {vid[:8]}] Cleaned up tracking state.")
+        logger.debug(f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Cleaned up tracking state.")
 
     def merge_ids(self, new_vid, lost_vid):
         if lost_vid in self.best_sharp_frame:
