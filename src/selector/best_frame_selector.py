@@ -37,12 +37,15 @@ class OnlineBestFrameSelector:
         self.no_improve_patience = no_improve_patience
         self.track_timeout = track_timeout
 
-    def update(self, vid, crop, frame_idx, original_frame=None, bbox=None):
+    def update(
+        self, vid, crop, plate_confidence, frame_idx, original_frame=None, bbox=None
+    ):
         """
         Update the selector with a new candidate frame for a vehicle.
         This method only stores the best frame found so far, without triggering OCR.
         """
-        score = self.scorer(crop)
+        score = plate_confidence
+
         self.last_seen[vid] = frame_idx
         self.missed_frames[vid] = 0  # Reset missed counter on update
 
