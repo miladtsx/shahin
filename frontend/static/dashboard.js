@@ -77,7 +77,6 @@ async function fetchPlates(query = "") {
     </div>
     `;
     tr.appendChild(actTd);
-
     tbody.appendChild(tr);
   });
 }
@@ -196,7 +195,6 @@ async function updatePlate(uuid, inputElem) {
   const updated = {
     plate_text: tr.children[3].children[0].value,
   };
-  // if (!confirm(`Update record ${id}?`)) return;
   showConfirm(
     `آیا از بروزرسانی پلاک ${uuid} مطمئنید؟`,
     await fetch(`/plates/${uuid}`, {
@@ -232,7 +230,6 @@ function restoreInputs() {
   if (saved.plate_text)
     document.getElementById("plate_text").value = saved.plate_text;
 }
-// add new plate modal
 
 async function deletePlate(uuid) {
   showConfirm(`پلاک ${uuid} برای همیشه حذف شود؟ مطمئنید؟`, async () => {

@@ -385,4 +385,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error starting backend: {e}")
     run_app()
-    webbrowser.open(f"http://127.0.0.1:{PORT}")
