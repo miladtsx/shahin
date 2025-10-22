@@ -1,7 +1,13 @@
 # config.py
 import yaml, os
+from typing import List
 from typing import TypedDict
 from src.common_utils.resource_path import get_data_path
+
+
+class Point(TypedDict):
+    x: float
+    y: float
 
 
 class MyConfig(TypedDict):
@@ -10,7 +16,7 @@ class MyConfig(TypedDict):
     car_detection_threshold: float
     plate_detection_threshold: float
     crop_dimension_threshold: int
-    hot_zone: dict
+    hot_zone: List[Point]
 
 
 DEFAULT_CONFIG: MyConfig = {
@@ -19,7 +25,12 @@ DEFAULT_CONFIG: MyConfig = {
     "car_detection_threshold": 0.6,
     "plate_detection_threshold": 0.5,
     "crop_dimension_threshold": 2400,
-    "hot_zone": {"x1": 0, "x2": 0, "y1": 0, "y2": 0},
+    "hot_zone": [  # polygon with 4 points by default
+        {"x": 0.25, "y": 0.25},
+        {"x": 0.75, "y": 0.25},
+        {"x": 0.75, "y": 0.75},
+        {"x": 0.25, "y": 0.75},
+    ],
 }
 
 

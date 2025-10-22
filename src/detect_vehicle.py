@@ -72,16 +72,20 @@ def run_plate_detection():
                 hot_zone = conf.get("hot_zone")
                 if hot_zone:
                     h, w = frame.shape[:2]
-                    zx1, zy1, zx2, zy2 = (
-                        int(hot_zone["x1"] * w),
-                        int(hot_zone["y1"] * h),
-                        int(hot_zone["x2"] * w),
-                        int(hot_zone["y2"] * h),
-                    )
-                    hot_rect = (zx1, zy1, zx2, zy2)
-                    roi = frame[zy1:zy2, zx1:zx2]
+                    # Convert normalized points to pixel coordinates
+                    hot_zone_pts = [
+                        (int(p["x"] * w), int(p["y"] * h)) for p in hot_zone
+                    ]
+
+                    # Create a mask for the polygon
+                    mask = np.zeros((h, w), dtype=np.uint8)
+                    cv2.fillPoly(mask, [np.array(hot_zone_pts, dtype=np.int32)], 255)
+
+                    # Apply mask to frame
+                    roi = cv2.bitwise_and(frame, frame, mask=mask)
+
                 else:
-                    hot_rect = None
+                    hot_zone_pts = []
                     roi = frame
 
                 # 1. Detect vehicles
@@ -97,12 +101,6 @@ def run_plate_detection():
                         f"Vehicle detection failed at frame {frame_count}: {e}"
                     )
                     continue
-
-                if hot_rect:
-                    # offset detections back to full-frame coordinates
-                    x_off, y_off = zx1, zy1
-                    vehicles[:, [0, 2]] += x_off  # shift x1, x2
-                    vehicles[:, [1, 3]] += y_off  # shift y1, y2
 
                 # 2. Track vehicles
                 try:
@@ -221,15 +219,6 @@ def run_plate_detection():
     executor.shutdown(wait=True)
     db.close()
     logger.info("Plate detection service stopped.")
-
-
-def in_hot_zone(bbox, zone):
-    if zone is None:
-        return True
-    x1, y1, x2, y2 = bbox
-    zx1, zy1, zx2, zy2 = zone
-    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-    return zx1 <= cx <= zx2 and zy1 <= cy <= zy2
 
 
 # Shrink box by a fixed margin percentage

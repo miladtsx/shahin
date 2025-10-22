@@ -526,7 +526,8 @@ const HotZone = (() => {
   const ctx = canvas.getContext("2d");
   const img = document.getElementById("hotZoneImage");
   const handleSize = 8;
-  let rect = { x1: 0, y1: 0, x2: 0, y2: 0 };
+  let polygon = [];
+  let selectedPoint = null;
   let action = null,
     offset = { x: 0, y: 0 };
 
@@ -535,8 +536,8 @@ const HotZone = (() => {
     img.src = document.getElementById("videoFeed").src;
     img.onload = () => {
       syncCanvas();
-      if (saved) rect = scaleRect(saved, canvas.width, canvas.height);
-      else rect = defaultRect();
+      if (saved) polygon = scalePolygon(saved, canvas.width, canvas.height);
+      else polygon = defaultPolygon();
       draw();
     };
   }
@@ -558,6 +559,12 @@ const HotZone = (() => {
     };
   }
 
+  function getPointAt(x, y) {
+    return polygon.find(
+      (p) => Math.abs(p.x - x) <= handleSize && Math.abs(p.y - y) <= handleSize
+    );
+  }
+
   function isOverHandle(x, y) {
     const handles = {
       tl: [rect.x1, rect.y1],
@@ -575,30 +582,29 @@ const HotZone = (() => {
 
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const x = Math.min(rect.x1, rect.x2),
-      y = Math.min(rect.y1, rect.y2),
-      w = Math.abs(rect.x2 - rect.x1),
-      h = Math.abs(rect.y2 - rect.y1);
+    if (polygon.length === 0) return;
+
     ctx.strokeStyle = "red";
     ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, w, h);
+    ctx.beginPath();
+    polygon.forEach((p, i) =>
+      i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
+    );
+    ctx.closePath();
+    ctx.stroke();
+
     ctx.fillStyle = "white";
     ctx.strokeStyle = "black";
-    Object.values({
-      tl: [rect.x1, rect.y1],
-      tr: [rect.x2, rect.y1],
-      bl: [rect.x1, rect.y2],
-      br: [rect.x2, rect.y2],
-    }).forEach(([hx, hy]) => {
+    polygon.forEach((p) => {
       ctx.fillRect(
-        hx - handleSize / 2,
-        hy - handleSize / 2,
+        p.x - handleSize / 2,
+        p.y - handleSize / 2,
         handleSize,
         handleSize
       );
       ctx.strokeRect(
-        hx - handleSize / 2,
-        hy - handleSize / 2,
+        p.x - handleSize / 2,
+        p.y - handleSize / 2,
         handleSize,
         handleSize
       );
@@ -607,31 +613,26 @@ const HotZone = (() => {
 
   function start(evt) {
     const { x, y } = getMousePos(evt);
-    const handle = isOverHandle(x, y);
-    if (handle) action = `resize-${handle}`;
-    else if (
-      x > Math.min(rect.x1, rect.x2) &&
-      x < Math.max(rect.x1, rect.x2) &&
-      y > Math.min(rect.y1, rect.y2) &&
-      y < Math.max(rect.y1, rect.y2)
-    ) {
-      action = "move";
-      offset.x = x - rect.x1;
-      offset.y = y - rect.y1;
+    selectedPoint = getPointAt(x, y);
+    if (!selectedPoint) {
+      action = "moveAll";
+      offset = { x, y };
     }
   }
 
   function move(evt) {
-    if (!action) return;
     const { x, y } = getMousePos(evt);
-    if (action.startsWith("resize-")) resize(action.split("-")[1], x, y);
-    else if (action === "move") {
-      const w = rect.x2 - rect.x1,
-        h = rect.y2 - rect.y1;
-      rect.x1 = x - offset.x;
-      rect.y1 = y - offset.y;
-      rect.x2 = rect.x1 + w;
-      rect.y2 = rect.y1 + h;
+    if (selectedPoint) {
+      selectedPoint.x = x;
+      selectedPoint.y = y;
+    } else if (action === "moveAll") {
+      const dx = x - offset.x,
+        dy = y - offset.y;
+      polygon.forEach((p) => {
+        p.x += dx;
+        p.y += dy;
+      });
+      offset = { x, y };
     }
     draw();
   }
@@ -658,23 +659,36 @@ const HotZone = (() => {
   }
 
   function end() {
+    selectedPoint = null;
     action = null;
     draw();
   }
 
   function save() {
-    const normalized = {
-      x1: rect.x1 / canvas.width,
-      y1: rect.y1 / canvas.height,
-      x2: rect.x2 / canvas.width,
-      y2: rect.y2 / canvas.height,
-    };
+    const normalized = polygon.map((p) => ({
+      x: p.x / canvas.width,
+      y: p.y / canvas.height,
+    }));
     const cfg = { ...config, hot_zone: normalized };
     return fetch("/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cfg),
     }).then(close);
+  }
+
+  function defaultPolygon() {
+    const w = canvas.width,
+      h = canvas.height;
+    return [
+      { x: w * 0.2, y: h * 0.2 },
+      { x: w * 0.8, y: h * 0.2 },
+      { x: w * 0.8, y: h * 0.8 },
+      { x: w * 0.2, y: h * 0.8 },
+    ];
+  }
+  function scalePolygon(saved, w, h) {
+    return saved.map((p) => ({ x: p.x * w, y: p.y * h }));
   }
 
   function defaultRect() {
