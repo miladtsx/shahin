@@ -10,6 +10,7 @@ class MyConfig(TypedDict):
     car_detection_threshold: float
     plate_detection_threshold: float
     crop_dimension_threshold: int
+    hot_zone: dict
 
 
 DEFAULT_CONFIG: MyConfig = {
@@ -18,6 +19,7 @@ DEFAULT_CONFIG: MyConfig = {
     "car_detection_threshold": 0.6,
     "plate_detection_threshold": 0.5,
     "crop_dimension_threshold": 2400,
+    "hot_zone": {"x1": 0, "x2": 0, "y1": 0, "y2": 0},
 }
 
 

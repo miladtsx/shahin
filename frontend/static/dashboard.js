@@ -406,23 +406,35 @@ document
 function openSettingsModal() {
   document.getElementById("settingsModal").style.display = "flex";
   loadSettings();
+
+  const hotZoneBtn = document.getElementById("hotZoneBtn");
+  if (hotZoneBtn && !hotZoneBtn.dataset.listenerAttached) {
+    hotZoneBtn.dataset.listenerAttached = "true";
+    hotZoneBtn.addEventListener("click", () => HotZone.open(config.hot_zone));
+  }
 }
 
 function closeSettingsModal() {
   document.getElementById("settingsModal").style.display = "none";
 }
 
+let config = {};
+
 async function loadSettings() {
-  const response = await fetch("/settings");
-  const config = await response.json();
-  for (const key in config) {
-    const input = document.getElementById(key);
-    if (input) {
-      input.value = config[key];
+  try {
+    const response = await fetch("/settings");
+    config = await response.json();
+    for (const key in config) {
+      const input = document.getElementById(key);
+      if (input) {
+        input.value = config[key];
+      }
     }
+    updateVideoStream();
+    checkBackendStatus();
+  } catch (error) {
+    console.error("Error loading settings:", error);
   }
-  updateVideoStream();
-  checkBackendStatus();
 }
 
 async function saveSettings() {
@@ -508,4 +520,187 @@ function updateVideoStream() {
     videoFeed.src = "";
   }
 }
+
+// #region Hot Zone Module
+const HotZone = (() => {
+  const canvas = document.getElementById("hotZoneCanvas");
+  const ctx = canvas.getContext("2d");
+  const img = document.getElementById("hotZoneImage");
+  const handleSize = 8;
+  let rect = { x1: 0, y1: 0, x2: 0, y2: 0 };
+  let action = null,
+    offset = { x: 0, y: 0 };
+
+  function open(saved) {
+    document.getElementById("hotZoneModal").style.display = "block";
+    img.src = document.getElementById("videoFeed").src;
+    img.onload = () => {
+      syncCanvas();
+      if (saved) rect = scaleRect(saved, canvas.width, canvas.height);
+      else rect = defaultRect();
+      draw();
+    };
+  }
+
+  function close() {
+    document.getElementById("hotZoneModal").style.display = "none";
+  }
+
+  function syncCanvas() {
+    canvas.width = img.clientWidth;
+    canvas.height = img.clientHeight;
+  }
+
+  function getMousePos(evt) {
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: (evt.clientX - r.left) * (canvas.width / r.width),
+      y: (evt.clientY - r.top) * (canvas.height / r.height),
+    };
+  }
+
+  function isOverHandle(x, y) {
+    const handles = {
+      tl: [rect.x1, rect.y1],
+      tr: [rect.x2, rect.y1],
+      bl: [rect.x1, rect.y2],
+      br: [rect.x2, rect.y2],
+    };
+    return (
+      Object.entries(handles).find(
+        ([name, [hx, hy]]) =>
+          Math.abs(x - hx) <= handleSize && Math.abs(y - hy) <= handleSize
+      )?.[0] || null
+    );
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const x = Math.min(rect.x1, rect.x2),
+      y = Math.min(rect.y1, rect.y2),
+      w = Math.abs(rect.x2 - rect.x1),
+      h = Math.abs(rect.y2 - rect.y1);
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "black";
+    Object.values({
+      tl: [rect.x1, rect.y1],
+      tr: [rect.x2, rect.y1],
+      bl: [rect.x1, rect.y2],
+      br: [rect.x2, rect.y2],
+    }).forEach(([hx, hy]) => {
+      ctx.fillRect(
+        hx - handleSize / 2,
+        hy - handleSize / 2,
+        handleSize,
+        handleSize
+      );
+      ctx.strokeRect(
+        hx - handleSize / 2,
+        hy - handleSize / 2,
+        handleSize,
+        handleSize
+      );
+    });
+  }
+
+  function start(evt) {
+    const { x, y } = getMousePos(evt);
+    const handle = isOverHandle(x, y);
+    if (handle) action = `resize-${handle}`;
+    else if (
+      x > Math.min(rect.x1, rect.x2) &&
+      x < Math.max(rect.x1, rect.x2) &&
+      y > Math.min(rect.y1, rect.y2) &&
+      y < Math.max(rect.y1, rect.y2)
+    ) {
+      action = "move";
+      offset.x = x - rect.x1;
+      offset.y = y - rect.y1;
+    }
+  }
+
+  function move(evt) {
+    if (!action) return;
+    const { x, y } = getMousePos(evt);
+    if (action.startsWith("resize-")) resize(action.split("-")[1], x, y);
+    else if (action === "move") {
+      const w = rect.x2 - rect.x1,
+        h = rect.y2 - rect.y1;
+      rect.x1 = x - offset.x;
+      rect.y1 = y - offset.y;
+      rect.x2 = rect.x1 + w;
+      rect.y2 = rect.y1 + h;
+    }
+    draw();
+  }
+
+  function resize(handle, x, y) {
+    switch (handle) {
+      case "tl":
+        rect.x1 = x;
+        rect.y1 = y;
+        break;
+      case "tr":
+        rect.x2 = x;
+        rect.y1 = y;
+        break;
+      case "bl":
+        rect.x1 = x;
+        rect.y2 = y;
+        break;
+      case "br":
+        rect.x2 = x;
+        rect.y2 = y;
+        break;
+    }
+  }
+
+  function end() {
+    action = null;
+    draw();
+  }
+
+  function save() {
+    const normalized = {
+      x1: rect.x1 / canvas.width,
+      y1: rect.y1 / canvas.height,
+      x2: rect.x2 / canvas.width,
+      y2: rect.y2 / canvas.height,
+    };
+    const cfg = { ...config, hot_zone: normalized };
+    return fetch("/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg),
+    }).then(close);
+  }
+
+  function defaultRect() {
+    return {
+      x1: canvas.width * 0.25,
+      y1: canvas.height * 0.25,
+      x2: canvas.width * 0.75,
+      y2: canvas.height * 0.75,
+    };
+  }
+  function scaleRect(saved, w, h) {
+    return {
+      x1: saved.x1 * w,
+      y1: saved.y1 * h,
+      x2: saved.x2 * w,
+      y2: saved.y2 * h,
+    };
+  }
+
+  canvas.onmousedown = start;
+  canvas.onmousemove = move;
+  canvas.onmouseup = canvas.onmouseleave = end;
+
+  return { open, close, save, draw };
+})();
+// #endregion
+
 // #endregion

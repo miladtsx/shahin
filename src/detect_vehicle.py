@@ -12,6 +12,7 @@ from src.common_utils.app_logger import get_logger, log_duration
 from concurrent.futures import ThreadPoolExecutor
 from src.common_utils.resource_path import get_resource_path, get_data_path
 from src.common_utils.debug_image import show
+import numpy as np
 
 logger = get_logger("detect", logfile="logs/app.jsonl")
 
@@ -35,7 +36,7 @@ def run_plate_detection():
     detector_plate = PlateDetector(
         get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
     )
-    tracker = Sort(max_age=120 * 5, min_hits=10, iou_threshold=0.7)
+    tracker = Sort(max_age=120 * 5, min_hits=5, iou_threshold=0.01)
     selector = OnlineBestFrameSelector(
         score_quality,
         no_improve_patience=conf.get("no_improve_patience", 20),
@@ -68,11 +69,26 @@ def run_plate_detection():
                 if frame_count % frame_skip != 0:
                     continue
 
+                hot_zone = conf.get("hot_zone")
+                if hot_zone:
+                    h, w = frame.shape[:2]
+                    zx1, zy1, zx2, zy2 = (
+                        int(hot_zone["x1"] * w),
+                        int(hot_zone["y1"] * h),
+                        int(hot_zone["x2"] * w),
+                        int(hot_zone["y2"] * h),
+                    )
+                    hot_rect = (zx1, zy1, zx2, zy2)
+                    roi = frame[zy1:zy2, zx1:zx2]
+                else:
+                    hot_rect = None
+                    roi = frame
+
                 # 1. Detect vehicles
                 try:
                     # with log_duration(logger, "detect_vehicles", frame=frame_count):
                     vehicles = detector_vehicle.detect(
-                        frame, conf_threshold=conf["car_detection_threshold"]
+                        roi, conf_threshold=conf["car_detection_threshold"]
                     )
                     if vehicles.size == 0:
                         continue
@@ -81,6 +97,12 @@ def run_plate_detection():
                         f"Vehicle detection failed at frame {frame_count}: {e}"
                     )
                     continue
+
+                if hot_rect:
+                    # offset detections back to full-frame coordinates
+                    x_off, y_off = zx1, zy1
+                    vehicles[:, [0, 2]] += x_off  # shift x1, x2
+                    vehicles[:, [1, 3]] += y_off  # shift y1, y2
 
                 # 2. Track vehicles
                 try:
@@ -141,6 +163,7 @@ def run_plate_detection():
                     # Process all valid plates and let OnlineBestFrameSelector handle quality evaluation
                     for plate in plates:
                         try:
+                            plate_confidence = plate.get("conf")
                             px1, py1, px2, py2 = shrink_box(*plate["bbox"])
 
                             plate_crop = vh_crop[py1:py2, px1:px2]
@@ -157,8 +180,12 @@ def run_plate_detection():
 
                             # Let OnlineBestFrameSelector handle quality evaluation
                             selector.update(
-                                vid, plate_crop, frame_count, original_frame=frame,
-                                bbox=trk.get("bbox")
+                                vid,
+                                plate_crop,
+                                plate_confidence,
+                                frame_count,
+                                original_frame=frame,
+                                bbox=trk.get("bbox"),
                             )
                         except Exception as e:
                             logger.error(
@@ -196,6 +223,15 @@ def run_plate_detection():
     logger.info("Plate detection service stopped.")
 
 
+def in_hot_zone(bbox, zone):
+    if zone is None:
+        return True
+    x1, y1, x2, y2 = bbox
+    zx1, zy1, zx2, zy2 = zone
+    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+    return zx1 <= cx <= zx2 and zy1 <= cy <= zy2
+
+
 # Shrink box by a fixed margin percentage
 def shrink_box(x1, y1, x2, y2, shrink_ratio=0.5):
     w = x2 - x1
@@ -215,7 +251,7 @@ def draw_boxes(frame, detections, color=(0, 255, 0), label="obj"):
         x1, y1, x2, y2 = map(int, det["bbox"])
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
-        txt = f"{det['id'][:8]}"
+        txt = f"{det['id'][:3]}"
         if "conf" in det:
             txt += f" {det['conf']:.2f}"
 

@@ -172,38 +172,149 @@
 
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeSettingsModal()">&times;</span>
-            <h3>تنظیمات</h3>
-            <div class="settings-container">
-                <div class="video-preview-wrapper">
-                    <img id="videoFeed" src="" alt="Video Preview">
-                    <p>وضعیت سرویس: <span id="backendStatus">نامشخص</span></p>
-                </div>
-                <div class="settings-form-wrapper">
-                    <div class="settings-form">
-                        <label for="video_path" title="مسیر فایل ویدیویی یا آدرس استریم دوربین.">آدرس دوربین:</label>
-                        <input type="text" dir="ltr" id="video_path" name="video_path" oninput="updateVideoStream()">
-                        
-                        <label for="frame_skip" title="تعداد فریم‌هایی که بین هر پردازش رد می‌شوند.">تعداد فریم‌های قابل رد کردن:</label>
-                        <input type="number" id="frame_skip" name="frame_skip">
+      <div class="modal-content">
+        <span class="modal-close" onclick="closeSettingsModal()">&times;</span>
+        <h3>تنظیمات</h3>
+        <div class="settings-container">
+          <div class="video-preview-wrapper">
+            <img id="videoFeed" src="" alt="Video Preview" />
+            <!-- <p>وضعیت سرویس: <span id="backendStatus">نامشخص</span></p> -->
+          </div>
+          <br />
+          <button class="button" id="hotZoneBtn">منطقه تشخیص</button>
+          <div class="settings-form-wrapper">
+            <div class="settings-form">
+              <label
+                for="video_path"
+                title="مسیر فایل ویدیویی یا آدرس استریم دوربین."
+                >آدرس دوربین:</label
+              >
+              <input
+                type="text"
+                dir="ltr"
+                id="video_path"
+                name="video_path"
+                oninput="updateVideoStream()"
+              />
 
-                        <label for="car_detection_threshold" title="حداقل اطمینان برای تشخیص خودرو (بین ۰ تا ۱).">حساسیت تشخیص خودرو:</label>
-                        <input type="number" step="0.1" id="car_detection_threshold" name="car_detection_threshold">
-                        
-                        <label for="plate_detection_threshold" title="حداقل اطمینان برای تشخیص پلاک (بین ۰ تا ۱).">حساسیت تشخیص پلاک:</label>
-                        <input type="number" step="0.1" id="plate_detection_threshold" name="plate_detection_threshold">
-                        
-                        <label for="crop_dimension_threshold" title="حداقل ابعاد (عرض یا ارتفاع) برای برش پلاک.">آستانه ابعاد برش پلاک:</label>
-                        <input type="number" id="crop_dimension_threshold" name="crop_dimension_threshold">
-                    </div>
-                </div>
+              <label
+                for="frame_skip"
+                title="تعداد فریم‌هایی که بین هر پردازش رد می‌شوند."
+                >تعداد فریم‌های قابل رد کردن:</label
+              >
+              <input type="number" id="frame_skip" name="frame_skip" />
+
+              <label
+                for="car_detection_threshold"
+                title="حداقل اطمینان برای تشخیص خودرو (بین ۰ تا ۱)."
+                >حساسیت تشخیص خودرو:</label
+              >
+              <input
+                type="number"
+                step="0.1"
+                id="car_detection_threshold"
+                name="car_detection_threshold"
+              />
+
+              <label
+                for="plate_detection_threshold"
+                title="حداقل اطمینان برای تشخیص پلاک (بین ۰ تا ۱)."
+                >حساسیت تشخیص پلاک:</label
+              >
+              <input
+                type="number"
+                step="0.1"
+                id="plate_detection_threshold"
+                name="plate_detection_threshold"
+              />
+
+              <label
+                for="crop_dimension_threshold"
+                title="حداقل ابعاد (عرض یا ارتفاع) برای برش پلاک."
+                >آستانه ابعاد برش پلاک:</label
+              >
+              <input
+                type="number"
+                id="crop_dimension_threshold"
+                name="crop_dimension_threshold"
+              />
             </div>
-            <div class="modal-actions">
-                <button class="button new-plate" onclick="saveSettings()">ذخیره و راه‌اندازی مجدد</button>
-                <button class="button clear-filter-btn" onclick="closeSettingsModal()">لغو</button>
-            </div>
+          </div>
         </div>
+        <div class="modal-actions">
+          <button class="button new-plate" onclick="saveSettings()">
+            ذخیره و راه‌اندازی مجدد
+          </button>
+          <button
+            class="button clear-filter-btn"
+            onclick="closeSettingsModal()"
+          >
+            لغو
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hot Zone Modal -->
+    <div id="hotZoneModal" class="modal">
+      <div
+        class="modal-content"
+        style="
+          position: relative;
+          width: 80%;
+          max-width: 1000px;
+          aspect-ratio: 16/9;
+          margin: auto;
+          top: 50%;
+          transform: translateY(-50%);
+        "
+      >
+        <span
+          class="modal-close"
+          onclick="HotZone.close()"
+          style="
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            cursor: pointer;
+          "
+          >&times;</span
+        >
+        <img
+          id="hotZoneImage"
+          autoplay
+          muted
+          style="width: 100%; height: 100%; object-fit: contain"
+        />
+        <canvas
+          id="hotZoneCanvas"
+          style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.4;
+            cursor: crosshair;
+          "
+        ></canvas>
+        <div
+          class="modal-actions"
+          style="
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+          "
+        >
+          <button class="button new-plate" onclick="HotZone.save()">ثبت</button>
+          <button class="button clear-filter-btn" onclick="HotZone.close()">
+            لغو
+          </button>
+        </div>
+      </div>
     </div>
 
     <script
