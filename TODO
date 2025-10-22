@@ -1,24 +1,23 @@
-[] make program run forever
 [] refetch list of plates in dashboard every second!
-[] Show total count in the middle bottom of the table
 [] remove redundant plates
 [] https://chatgpt.com/c/68b5af97-d6e8-832d-a353-30fa4d06d500
 [] cpu vs gpu, how to tell the difference?
 [+] save the whole image of sampling plate
 [+] car info [type, color] when plate is unknown
-    [+] add metadata for a plate.
+[+] add metadata for a plate.
 [+] read video when video is available, if camera restarted, just read it and restart.
 [+] convert timestamp to local instead of utc
 [+] admin dashboard to read stream to enalbe test
-[] admin dashboard enable sensitive area selection.
+[+] make program run forever
+[+] instead of the most sharp plate, get the most confident one!
+[+] admin dashboard enable sensitive area selection.
+[+] out directory should be unique per each car so they dont overwrite old data
 [] windows service to make sure app is always on
-[] try to detect when plate is not detected or 
-    add a confidence score 
+[] try to detect when plate is not detected or add a confidence score
 [] record a video of a car with low confidence score
 [] video is dead, let the operator know.
 [] auto start application, do not ask operator to start backend or dashboard.
 [] common errors reading video streams and make the app resilient.
-[] out directory should be unique per each car so they dont overwrite old data
-[] 44730354-44872583-44745654
-[] 44740650
 
+[] make settings user friendly
+[] sensitivity: a draggable bar or 3 options (low, medium, high)
