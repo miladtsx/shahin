@@ -729,3 +729,86 @@ document.addEventListener("keydown", function (e) {
     });
   }
 });
+
+// Zoom Image
+const modalImg = document.getElementById("modalLargeImg");
+const fsModal = document.getElementById("fullscreenImgModal");
+const fsImg = document.getElementById("fullscreenImg");
+
+let fsScale = 1;
+let offset = { x: 0, y: 0 };
+let dragStart = null;
+let isDragging = false;
+
+// Open fullscreen modal
+modalImg.addEventListener("click", () => {
+  fsImg.src = modalImg.src;
+  fsModal.style.display = "flex";
+  fsScale = 1;
+  offset = { x: 0, y: 0 };
+  updateTransform();
+});
+
+// Close on click (only if not dragging)
+fsImg.addEventListener("click", (e) => {
+  if (!isDragging) fsModal.style.display = "none";
+});
+
+// Zoom on wheel where mouse is pointing
+fsModal.addEventListener("wheel", (e) => {
+  e.preventDefault();
+
+  const rect = fsImg.getBoundingClientRect();
+  const zoomFactor = e.deltaY < 0 ? 1.3 : 0.9;
+  const prevScale = fsScale;
+  fsScale = Math.min(Math.max(fsScale * zoomFactor, 1), 5);
+
+  // Mouse position relative to image center
+  const imgCenterX = rect.left + rect.width / 2;
+  const imgCenterY = rect.top + rect.height / 2;
+  const mouseX = e.clientX - imgCenterX;
+  const mouseY = e.clientY - imgCenterY;
+
+  if (fsScale === 1) {
+    offset = { x: 0, y: 0 };
+  } else {
+    // Adjust offset so zoom pivots on cursor
+    offset.x -= mouseX * (fsScale / prevScale - 1);
+    offset.y -= mouseY * (fsScale / prevScale - 1);
+  }
+
+  updateTransform();
+});
+
+// Drag to move zoomed image
+fsImg.addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  dragStart = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+  isDragging = false;
+  fsImg.style.cursor = "grabbing";
+});
+
+document.addEventListener("mousemove", (e) => {
+  if (!dragStart) return;
+  const dx = e.clientX - (dragStart.x + offset.x);
+  const dy = e.clientY - (dragStart.y + offset.y);
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) isDragging = true;
+
+  offset.x = e.clientX - dragStart.x;
+  offset.y = e.clientY - dragStart.y;
+  updateTransform();
+});
+
+document.addEventListener("mouseup", () => {
+  dragStart = null;
+  fsImg.style.cursor = "grab";
+});
+
+// Close on ESC
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") fsModal.style.display = "none";
+});
+
+function updateTransform() {
+  fsImg.style.transform = `translate(${offset.x}px, ${offset.y}px) scale(${fsScale})`;
+}
