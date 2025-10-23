@@ -63,19 +63,25 @@ class DB:
             cur = self._conn.cursor()
             plate_uuid = vehicle_id
 
-            if plate_text != "DETECTION_FAILED":
-                # ensure plate exists
+            if plate_text == "DETECTION_FAILED":
+                # always insert a new row
+                cur.execute(
+                    "INSERT INTO plates (uuid, plate_text) VALUES (?, ?)",
+                    (plate_uuid, plate_text),
+                )
+            else:
+                # reuse existing if found, else insert new
                 cur.execute(
                     "SELECT uuid FROM plates WHERE plate_text = ?", (plate_text,)
                 )
                 row = cur.fetchone()
                 if row:
                     plate_uuid = row[0]
-            else:
-                cur.execute(
-                    "INSERT INTO plates (uuid, plate_text) VALUES (?, ?)",
-                    (plate_uuid, plate_text),
-                )
+                else:
+                    cur.execute(
+                        "INSERT INTO plates (uuid, plate_text) VALUES (?, ?)",
+                        (plate_uuid, plate_text),
+                    )
 
             # optionally insert/update metadata
             if metadata:
