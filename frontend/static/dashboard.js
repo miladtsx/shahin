@@ -40,7 +40,7 @@ async function fetchPlates(query = "") {
     const tr = document.createElement("tr");
 
     const imgTd = document.createElement("td");
-    imgTd.innerHTML = `<img src="/tiny_plate_image/${p.uuid}/best" 
+    imgTd.innerHTML = `<img src="/tiny_plate_image/${p.uuid}/plate" 
     onclick='openPlateImageModal("/plate_image/${
       p.uuid
     }/original", ${JSON.stringify(p).replace(/"/g, "&quot;")})'>`;
