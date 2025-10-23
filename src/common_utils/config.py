@@ -17,6 +17,7 @@ class MyConfig(TypedDict):
     plate_detection_threshold: float
     crop_dimension_threshold: int
     hot_zone: List[Point]
+    track_expiry: int  # Frames until car tracking expires
 
 
 DEFAULT_CONFIG: MyConfig = {
@@ -31,6 +32,7 @@ DEFAULT_CONFIG: MyConfig = {
         {"x": 0.75, "y": 0.75},
         {"x": 0.25, "y": 0.75},
     ],
+    "track_expiry": 120,
 }
 
 
