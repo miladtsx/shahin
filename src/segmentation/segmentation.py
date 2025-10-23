@@ -98,7 +98,7 @@ class PlateSegmentation:
 
             raw_boxes.append((x, y, w, h))
 
-        # 🔧 Apply dot merging
+        # 🔧 Apply dot merging in farsi alphabets
         merged_boxes = self._merge_dots_into_glyphs(raw_boxes)
         boxes = sorted(merged_boxes, key=lambda b: b[0])
 
