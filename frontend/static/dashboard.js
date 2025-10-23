@@ -717,3 +717,15 @@ const HotZone = (() => {
 // #endregion
 
 // #endregion
+
+// Close modal on Escape key press
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") {
+    const modals = document.querySelectorAll(".modal");
+    modals.forEach((m) => {
+      if (m.style.display === "flex" || m.style.display === "block") {
+        m.style.display = "none";
+      }
+    });
+  }
+});
