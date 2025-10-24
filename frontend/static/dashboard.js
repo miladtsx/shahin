@@ -110,7 +110,7 @@ function openPlateImageModal(src, plateData) {
     <p>شناسه: ${plateData.uuid}</p>
     <div class="plateTextModalContainer">
     <p><strong>شماره پلاک:</strong> <input class="center-text" id="editPlateText" value="${plateData.plate_text}"></p>
-    <p><strong>بدنه خودرو:</strong> <input class="center-text" id="editCarType" value="${plateData.car_type}"></p>
+    <p><strong>نوع خودرو:</strong> <input class="center-text" id="editCarType" value="${plateData.car_type}"></p>
   <p><strong>رنگ خودرو:</strong> <input class="center-text" id="editCarColor" value="${plateData.car_color}"></p>
   <p><strong>صاحب خودرو:</strong> <input class="center-text" id="editCarOwner" value="${plateData.car_owner}"></p>
     </div>
