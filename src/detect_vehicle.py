@@ -11,7 +11,7 @@ from src.common_utils.config import Config
 from src.common_utils.app_logger import get_logger, log_duration
 from concurrent.futures import ThreadPoolExecutor
 from src.common_utils.resource_path import get_resource_path, get_data_path
-from src.common_utils.debug_image import show
+from src.common_utils.debug_image import show, draw_boxes
 import numpy as np
 
 logger = get_logger("detect", logfile="logs/app.jsonl")
@@ -23,7 +23,7 @@ def run_plate_detection():
     db = DB()
 
     # Initialize components
-    detector_vehicle = VehicleDetector(
+    vehicle_detector = VehicleDetector(
         get_resource_path("res/models/vehicle_detector_yolov11n.pt"),
         [
             1,  # Bicycle
@@ -100,7 +100,7 @@ def run_plate_detection():
 
                     # region Detect
                     try:
-                        vehicles = detector_vehicle.detect(
+                        vehicles = vehicle_detector.detect(
                             roi, conf_threshold=conf["car_detection_threshold"]
                         )
                         if vehicles.size == 0:
@@ -122,7 +122,7 @@ def run_plate_detection():
                     ]
                     # Update tracker IDs to UUIDs
                     tracked_vehicles = [
-                        detector_vehicle.get_uuid(trk) for trk in tracked_vehicles
+                        vehicle_detector.get_uuid(trk) for trk in tracked_vehicles
                     ]
                     if not tracked_vehicles:
                         continue
@@ -131,8 +131,7 @@ def run_plate_detection():
                     active_ids = (
                         set()
                     )  # TODO POST MVP remove and use the internal selector tracking
-                    vehicle_uuids = []
-                    show(draw_boxes(frame.copy(), tracked_vehicles), "Vehicle Tracked")
+                    show(draw_boxes(frame, tracked_vehicles), "Vehicle Tracked")
                     # endregion
 
                     # region Selection
@@ -145,21 +144,14 @@ def run_plate_detection():
                         cvc = frame[y1:y2, x1:x2]
                         if cvc.size > 0:
                             vehicle_crops.append(cvc)
-                            vehicle_uuids.append(vuuid)
-
-                        # Batch plate detection
-                        if (
-                            vehicle_crops
-                        ):  # Only run plate detection if we have valid crops
+                            # Batch plate detection
                             plates_batch = detector_plate.detect_batch(
                                 vehicle_crops,
                                 conf_threshold=conf.get("plate_detection_threshold"),
                             )
 
                             # region Score plate(s)
-                            for vuuid, plates, vh_crop in zip(
-                                vehicle_uuids, plates_batch, vehicle_crops
-                            ):
+                            for plates, vh_crop in zip(plates_batch, vehicle_crops):
                                 if not plates:
                                     continue
 
@@ -180,9 +172,7 @@ def run_plate_detection():
                                             plate_crop,
                                             frame_index,
                                             full_frame=frame,
-                                            vehicle_crop=t.get(
-                                                "bbox"
-                                            ),  # why not just passing the plate crop?
+                                            vehicle_crop=t.get("bbox"),
                                         )
                                     except Exception as e:
                                         # if failed to process one plate, keep processing other plates.
@@ -233,35 +223,3 @@ def shrink_box(x1, y1, x2, y2, shrink_ratio=0.5):
     dxr = int(w * 0.06)
     dy = int(h * 0.23)
     return x1 + dxl, y1 + dy, x2 - dxr, y2 - dy
-
-
-def draw_boxes(frame, detections, color=(0, 255, 0), label="obj"):
-    """
-    detections: list of dicts with 'bbox' and optional 'conf'
-    bbox format: (x1, y1, x2, y2)
-    """
-    for det in detections:
-        x1, y1, x2, y2 = map(int, det["bbox"])
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-        txt = f"{det['id'][:3]}"
-        if "conf" in det:
-            txt += f" {det['conf']:.2f}"
-
-        # small text above box
-        cv2.putText(frame, txt, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-        # large text inside box (centered)
-        text_size, _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)
-        text_w, text_h = text_size
-        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-        cv2.putText(
-            frame,
-            txt,
-            (cx - text_w // 2, cy + text_h // 2),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1.5,
-            color,
-            3,
-        )
-    return frame

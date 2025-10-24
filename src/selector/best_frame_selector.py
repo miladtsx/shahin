@@ -5,7 +5,7 @@ from src.segmentation.segmentation import PlateSegmentation
 from src.preprocessor.preprocessor import PlatePreprocessor
 from src.common_utils.app_logger import get_logger
 from src.common_utils.image_save import save
-from src.common_utils.debug_image import show
+from src.common_utils.debug_image import show, draw_boxes
 from dataclasses import dataclass
 import numpy as np
 from typing import Dict, List, Tuple
