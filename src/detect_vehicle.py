@@ -47,7 +47,7 @@ def run_plate_detection():
 
     logger.info("Starting continuous plate detection service...")
 
-    # Continuous operation loop
+    # Continuous Monitoring
     while True:
         try:
             logger.info("Initializing video loader...")
@@ -166,32 +166,18 @@ def run_plate_detection():
                                 # Process all valid plates and let OnlineBestFrameSelector handle quality evaluation
                                 for plate in plates:
                                     try:
-                                        plate_confidence = plate.get("conf")
                                         # clean cut the plate crop
                                         px1, py1, px2, py2 = shrink_box(*plate["bbox"])
 
                                         plate_crop = vh_crop[py1:py2, px1:px2]
                                         if plate_crop.size == 0:
                                             continue
-                                        show(plate_crop, "Plate")
-
-                                        pw, ph = px2 - px1, py2 - py1
-                                        threshold = int(
-                                            conf.get("crop_dimension_threshold", 0)
-                                        )
-                                        dimension = pw * ph
-                                        aspect_ratio = pw / ph
-
-                                        if dimension < threshold:
-                                            continue
-                                        if aspect_ratio < 1.5 or aspect_ratio > 6.0:
-                                            continue
+                                        # show(plate_crop, "Plate")
 
                                         # Let OnlineBestFrameSelector handle quality evaluation
                                         selector.update(
                                             vuuid,
                                             plate_crop,
-                                            plate_confidence,
                                             frame_index,
                                             full_frame=frame,
                                             vehicle_crop=t.get(
@@ -222,10 +208,11 @@ def run_plate_detection():
                 except Exception as e:
                     continue
             # endregion
+        # region Graceful Exit Handling
         except Exception as e:
             logger.error(f"Video processing failed: {e}")
-            logger.info("Restarting video processing in 5 seconds...")
-            time.sleep(5)  # Wait before retrying
+            logger.info("Restarting video processing in 1 seconds...")
+            time.sleep(1)  # Wait before retrying
         except KeyboardInterrupt:
             logger.info("Received shutdown signal, stopping gracefully...")
             break
@@ -235,6 +222,7 @@ def run_plate_detection():
             executor.shutdown(wait=True)
             db.close()
             logger.info("Plate detection service stopped.")
+        # endregion
 
 
 # Shrink box by a fixed margin percentage

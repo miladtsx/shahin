@@ -13,7 +13,7 @@ from typing import Dict, List, Tuple
 logger = get_logger("best_frame_selector", logfile="logs/app.jsonl")
 # @dev for easier visual debugging
 LOG_UUID_FRACTION = 3
-TOP_K = 300  # keep top 300 frames per vehicle
+TOP_K = 10  # keep top 10 frames per vehicle
 
 
 @dataclass
@@ -35,10 +35,8 @@ class OnlineBestFrameSelector:
         self.scorer = scorer
         self.db = db
 
-        self.most_confident_plate_crop: Dict[
-            str, List[Tuple[float, int, FrameData]]
-        ] = {}
-        self.best_fully_visible_vehicle_frame: Dict[
+        self.top_plates: Dict[str, List[Tuple[float, int, FrameData]]] = {}
+        self.top_fully_visible_vehicle: Dict[
             str, List[Tuple[float, int, FrameData]]
         ] = {}
 
@@ -62,7 +60,6 @@ class OnlineBestFrameSelector:
         self,
         vid,
         crop,
-        new_confidence,
         frame_idx,
         full_frame,
         vehicle_crop,
@@ -74,42 +71,41 @@ class OnlineBestFrameSelector:
         self.last_seen_frame_idx[vid] = frame_idx
         self.missed_frames[vid] = 0
 
+        quality_score = self.scorer(crop)
+        if quality_score == 0.0:
+            return
         # --- Update plate confidence candidates ---
-        heap: List[Tuple[float, int, FrameData]] = (
-            self.most_confident_plate_crop.setdefault(vid, [])
-        )
+        heap: List[Tuple[float, int, FrameData]] = self.top_plates.setdefault(vid, [])
         heappush(
             heap,
             (
-                new_confidence,
+                quality_score,
                 frame_idx,
-                FrameData(new_confidence, crop.copy(), frame_idx, full_frame.copy()),
+                FrameData(quality_score, crop.copy(), frame_idx, full_frame.copy()),
             ),
         )
         # keep only top K by confidence
-        self.most_confident_plate_crop[vid] = nlargest(TOP_K, heap, key=lambda x: x[0])
+        self.top_plates[vid] = nlargest(TOP_K, heap, key=lambda x: x[0])
 
         # --- Update fully visible vehicle candidates ---
         if vehicle_crop is not None and self.is_fully_visible(
             vehicle_crop, full_frame.shape
         ):
             heap_vis: List[Tuple[float, int, FrameData]] = (
-                self.best_fully_visible_vehicle_frame.setdefault(vid, [])
+                self.top_fully_visible_vehicle.setdefault(vid, [])
             )
             visibility_score = (
-                new_confidence  # could replace with sharpness or other metric
+                quality_score  # could replace with sharpness or other metric
             )
             heappush(
                 heap_vis,
                 (
                     visibility_score,
                     frame_idx,
-                    FrameData(
-                        new_confidence, crop.copy(), frame_idx, full_frame.copy()
-                    ),
+                    FrameData(quality_score, crop.copy(), frame_idx, full_frame.copy()),
                 ),
             )
-            self.best_fully_visible_vehicle_frame[vid] = nlargest(
+            self.top_fully_visible_vehicle[vid] = nlargest(
                 TOP_K, heap_vis, key=lambda x: x[0]
             )
 
@@ -197,8 +193,8 @@ class OnlineBestFrameSelector:
         self.finalized.add(vid)
 
         # Extract and remove best candidates so we can still inspect them before cleanup
-        plate_candidates = self.most_confident_plate_crop.pop(vid, [])
-        vehicle_candidates = self.best_fully_visible_vehicle_frame.pop(vid, [])
+        plate_candidates = self.top_plates.pop(vid, [])
+        vehicle_candidates = self.top_fully_visible_vehicle.pop(vid, [])
 
         # Pick best available frame
         best_frame_data = None
@@ -276,13 +272,11 @@ class OnlineBestFrameSelector:
             d.pop(vid, None)
 
     def merge_ids(self, new_vid, lost_vid):
-        if lost_vid in self.most_confident_plate_crop:
-            self.most_confident_plate_crop[new_vid] = (
-                self.most_confident_plate_crop.pop(lost_vid)
-            )
-        if lost_vid in self.best_fully_visible_vehicle_frame:
-            self.best_fully_visible_vehicle_frame[new_vid] = (
-                self.best_fully_visible_vehicle_frame.pop(lost_vid)
+        if lost_vid in self.top_plates:
+            self.top_plates[new_vid] = self.top_plates.pop(lost_vid)
+        if lost_vid in self.top_fully_visible_vehicle:
+            self.top_fully_visible_vehicle[new_vid] = (
+                self.top_fully_visible_vehicle.pop(lost_vid)
             )
         if lost_vid in self.last_seen_frame_idx:
             self.last_seen_frame_idx[new_vid] = self.last_seen_frame_idx.pop(lost_vid)
@@ -294,7 +288,6 @@ class OnlineBestFrameSelector:
     def is_fully_visible(self, bbox, frame_shape):
         x1, y1, x2, y2 = bbox
         h, w = frame_shape[:2]
-        print(x1 >= 0 and y1 >= 0 and x2 <= w and y2 <= h)
         return x1 >= 0 and y1 >= 0 and x2 <= w and y2 <= h
 
 
