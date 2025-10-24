@@ -32,7 +32,9 @@ async function fetchPlates(query = "") {
   document.getElementById(
     "pageInfo"
   ).textContent = `صفحه ${meta.page} از ${TOTAL_PAGES}`;
-
+  document.getElementById(
+    "totalRowsInfo"
+  ).textContent = `تعداد کل: ${toFarsiNumber(meta.total)}`;
   const tbody = document.getElementById("plates_body");
   tbody.innerHTML = "";
 
