@@ -36,8 +36,9 @@ def run_plate_detection():
     detector_plate = PlateDetector(
         get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
     )
-    tracker = Sort(max_age=120 * 5, min_hits=5, iou_threshold=0.01)
+    tracker = Sort(max_age=120, min_hits=1, iou_threshold=0.3)
     selector = OnlineBestFrameSelector(
+        db,
         score_quality,
         no_improve_patience=conf.get("no_improve_patience", 20),
         track_timeout=conf.get("track_timeout", 15),
@@ -56,169 +57,184 @@ def run_plate_detection():
                 max_retry_delay=conf.get("video_max_retry_delay", 60),
             )
 
-            frame_count = 0
+            frame_index = 0
 
             frame_skip = max(conf.get("frame_skip", 1), 1)  # always ≥1
 
             logger.info("Starting video processing...")
+            # region Processing
             for frame in loader:
-                if not frame.any() or frame.mean() < 5:  # near black
-                    logger.warning("Black frame detected, camera may be dead")
-                    continue
-                frame_count += 1
-                if frame_count % frame_skip != 0:
-                    continue
-
-                hot_zone = conf.get("hot_zone")
-                if hot_zone:
-                    h, w = frame.shape[:2]
-                    # Convert normalized points to pixel coordinates
-                    hot_zone_pts = [
-                        (int(p["x"] * w), int(p["y"] * h)) for p in hot_zone
-                    ]
-
-                    # Create a mask for the polygon
-                    mask = np.zeros((h, w), dtype=np.uint8)
-                    cv2.fillPoly(mask, [np.array(hot_zone_pts, dtype=np.int32)], 255)
-
-                    # Apply mask to frame
-                    roi = cv2.bitwise_and(frame, frame, mask=mask)
-
-                else:
-                    hot_zone_pts = []
-                    roi = frame
-
-                # 1. Detect vehicles
                 try:
-                    # with log_duration(logger, "detect_vehicles", frame=frame_count):
-                    vehicles = detector_vehicle.detect(
-                        roi, conf_threshold=conf["car_detection_threshold"]
-                    )
-                    if vehicles.size == 0:
+                    # region Validate
+                    if not frame.any() or frame.mean() < 5:  # near black
+                        logger.warning("Black frame detected, camera may be dead")
                         continue
-                except Exception as e:
-                    logger.error(
-                        f"Vehicle detection failed at frame {frame_count}: {e}"
-                    )
-                    continue
+                    frame_index += 1
+                    if frame_index % frame_skip != 0:
+                        continue
+                    # endregion
 
-                # 2. Track vehicles
-                try:
+                    # region Hotzone
+                    hot_zone = conf.get("hot_zone")
+                    if hot_zone:
+                        h, w = frame.shape[:2]
+                        # Convert normalized points to pixel coordinates
+                        hot_zone_pts = [
+                            (int(p["x"] * w), int(p["y"] * h)) for p in hot_zone
+                        ]
+
+                        # Create a mask for the polygon
+                        mask = np.zeros((h, w), dtype=np.uint8)
+                        cv2.fillPoly(
+                            mask, [np.array(hot_zone_pts, dtype=np.int32)], 255
+                        )
+
+                        # Apply mask to frame
+                        roi = cv2.bitwise_and(frame, frame, mask=mask)
+
+                    else:
+                        hot_zone_pts = []
+                        roi = frame
+
+                    # endregion
+
+                    # region Detect
+                    try:
+                        vehicles = detector_vehicle.detect(
+                            roi, conf_threshold=conf["car_detection_threshold"]
+                        )
+                        if vehicles.size == 0:
+                            continue
+                    except Exception as e:
+                        logger.error(
+                            f"Vehicle detection failed at frame {frame_index}: {e}"
+                        )
+                        continue
+                    # endregion
+
+                    # region Track
                     tracked = tracker.update(vehicles)
+                    if tracked.size == 0:
+                        continue
                     tracked_vehicles = [
                         {"id": int(trk[4]), "bbox": tuple(map(int, trk[:4]))}
                         for trk in tracked
                     ]
                     # Update tracker IDs to UUIDs
                     tracked_vehicles = [
-                        detector_vehicle.get_uuid(v) for v in tracked_vehicles
+                        detector_vehicle.get_uuid(trk) for trk in tracked_vehicles
                     ]
+                    if not tracked_vehicles:
+                        continue
                     active_boxes = {trk["id"]: trk["bbox"] for trk in tracked_vehicles}
 
-                except Exception as e:
-                    logger.error(f"Vehicle tracking failed at frame {frame_count}: {e}")
-                    continue
+                    active_ids = (
+                        set()
+                    )  # TODO POST MVP remove and use the internal selector tracking
+                    vehicle_uuids = []
+                    show(draw_boxes(frame.copy(), tracked_vehicles), "Vehicle Tracked")
+                    # endregion
 
-                active_ids = set()
-                vehicle_crops = []
-                vehicle_ids = []
-                show(draw_boxes(frame, tracked_vehicles), "Vehicle")
+                    # region Selection
+                    for t in tracked_vehicles:
+                        vuuid = t["id"]
+                        active_ids.add(vuuid)
+                        selector.mark_seen(vuuid, frame_index, frame)
+                        x1, y1, x2, y2 = t["bbox"]
+                        vehicle_crops = []
+                        cvc = frame[y1:y2, x1:x2]
+                        if cvc.size > 0:
+                            vehicle_crops.append(cvc)
+                            vehicle_uuids.append(vuuid)
 
-                # 3. Prepare crops
-                for trk in tracked_vehicles:
-                    vid = trk["id"]
-                    active_ids.add(vid)
-                    selector.mark_seen(vid, frame_count, frame)
-                    x1, y1, x2, y2 = trk["bbox"]
-                    car_crop = frame[y1:y2, x1:x2]
-                    if car_crop.size > 0:
-                        vehicle_crops.append(car_crop)
-                        vehicle_ids.append(vid)
-
-                # 4. Batch plate detection (only for vehicles with valid crops)
-                plates_batch = []
-                if vehicle_crops:  # Only run plate detection if we have valid crops
-                    try:
-                        plates_batch = detector_plate.detect_batch(
-                            vehicle_crops,
-                            conf_threshold=conf.get("plate_detection_threshold"),
-                        )
-                    except Exception as e:
-                        logger.error(
-                            f"Plate detection failed at frame {frame_count}: {e}"
-                        )
-                        plates_batch = [
-                            [] for _ in vehicle_crops
-                        ]  # Empty results for all vehicles
-
-                # 5. Process detected plates
-                for vid, plates, vh_crop in zip(
-                    vehicle_ids, plates_batch, vehicle_crops
-                ):
-                    if not plates:
-                        continue
-
-                    # Process all valid plates and let OnlineBestFrameSelector handle quality evaluation
-                    for plate in plates:
-                        try:
-                            plate_confidence = plate.get("conf")
-                            px1, py1, px2, py2 = shrink_box(*plate["bbox"])
-
-                            plate_crop = vh_crop[py1:py2, px1:px2]
-                            if plate_crop.size == 0:
-                                continue
-                            # show(plate_crop, "Plate")
-
-                            pw, ph = px2 - px1, py2 - py1
-                            if pw * ph < int(conf.get("crop_dimension_threshold", 0)):
-                                continue
-                            aspect_ratio = pw / ph
-                            if aspect_ratio < 1.5 or aspect_ratio > 6.0:
-                                continue
-
-                            # Let OnlineBestFrameSelector handle quality evaluation
-                            selector.update(
-                                vid,
-                                plate_crop,
-                                plate_confidence,
-                                frame_count,
-                                original_frame=frame,
-                                bbox=trk.get("bbox"),
+                        # Batch plate detection
+                        if (
+                            vehicle_crops
+                        ):  # Only run plate detection if we have valid crops
+                            plates_batch = detector_plate.detect_batch(
+                                vehicle_crops,
+                                conf_threshold=conf.get("plate_detection_threshold"),
                             )
-                        except Exception as e:
-                            logger.error(
-                                f"Error processing plate for vehicle {vid}: {e}"
-                            )
-                            continue
 
-                # 6. Finalize tracks once per frame
-                try:
-                    to_finalize = selector.step_end(
-                        active_ids, frame_count, active_boxes=active_boxes
+                            # region Score plate(s)
+                            for vuuid, plates, vh_crop in zip(
+                                vehicle_uuids, plates_batch, vehicle_crops
+                            ):
+                                if not plates:
+                                    continue
+
+                                # Process all valid plates and let OnlineBestFrameSelector handle quality evaluation
+                                for plate in plates:
+                                    try:
+                                        plate_confidence = plate.get("conf")
+                                        # clean cut the plate crop
+                                        px1, py1, px2, py2 = shrink_box(*plate["bbox"])
+
+                                        plate_crop = vh_crop[py1:py2, px1:px2]
+                                        if plate_crop.size == 0:
+                                            continue
+                                        show(plate_crop, "Plate")
+
+                                        pw, ph = px2 - px1, py2 - py1
+                                        threshold = int(
+                                            conf.get("crop_dimension_threshold", 0)
+                                        )
+                                        dimension = pw * ph
+                                        aspect_ratio = pw / ph
+
+                                        if dimension < threshold:
+                                            continue
+                                        if aspect_ratio < 1.5 or aspect_ratio > 6.0:
+                                            continue
+
+                                        # Let OnlineBestFrameSelector handle quality evaluation
+                                        selector.update(
+                                            vuuid,
+                                            plate_crop,
+                                            plate_confidence,
+                                            frame_index,
+                                            full_frame=frame,
+                                            vehicle_crop=t.get(
+                                                "bbox"
+                                            ),  # why not just passing the plate crop?
+                                        )
+                                    except Exception as e:
+                                        # if failed to process one plate, keep processing other plates.
+                                        # one failure should not bring the whole system down.
+                                        logger.error(
+                                            f"Error processing plate for vehicle {vuuid}: {e}"
+                                        )
+                                        continue
+                            # endregion
+
+                    # endregion
+
+                    # region Finalize
+                    to_finalize = selector.to_finalize(
+                        active_ids, frame_index, active_boxes=active_boxes
                     )
                     if len(to_finalize):
-                        for vid in to_finalize:
+                        for vuuid in to_finalize:
                             # executor.submit(selector.finalize, db, vid)
-                            selector.finalize(db, vid)
-                except Exception as e:
-                    logger.error(
-                        f"Track finalization failed at frame {frame_count}: {e}"
-                    )
+                            selector.finalize(vuuid)
+                    # endregion
 
+                except Exception as e:
+                    continue
+            # endregion
         except Exception as e:
             logger.error(f"Video processing failed: {e}")
-            logger.info("Restarting video processing in 10 seconds...")
-            time.sleep(10)  # Wait before retrying
-
+            logger.info("Restarting video processing in 5 seconds...")
+            time.sleep(5)  # Wait before retrying
         except KeyboardInterrupt:
             logger.info("Received shutdown signal, stopping gracefully...")
             break
-
-    # Cleanup
-    logger.info("Shutting down plate detection service...")
-    executor.shutdown(wait=True)
-    db.close()
-    logger.info("Plate detection service stopped.")
+        finally:
+            # Cleanup
+            logger.info("Shutting down plate detection service...")
+            executor.shutdown(wait=True)
+            db.close()
+            logger.info("Plate detection service stopped.")
 
 
 # Shrink box by a fixed margin percentage
