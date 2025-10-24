@@ -79,25 +79,26 @@ def list_plates():
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
 
-    query = """ \
-        SELECT p.uuid, p.plate_text, p.timestamp, 
-            m.car_type, m.car_color, m.car_owner 
-        FROM plates p
-        LEFT JOIN metadata m ON p.uuid = m.plate_uuid
-        WHERE 1=1
+    query = """
+    SELECT p.uuid, p.plate_text, t.timestamp,
+        m.car_type, m.car_color, m.car_owner
+    FROM traffic t
+    JOIN plates p ON t.plate_uuid = p.uuid
+    LEFT JOIN metadata m ON p.uuid = m.plate_uuid
+    WHERE 1=1
     """
     params = []
     if plate_text:
         query += " AND p.plate_text LIKE ?"
         params.append(f"%{plate_text}%")
     if start_ts:
-        query += " AND p.timestamp >= ?"
+        query += " AND t.timestamp >= ?"
         params.append(start_ts)
     if end_ts:
-        query += " AND p.timestamp <= ?"
+        query += " AND t.timestamp <= ?"
         params.append(end_ts)
 
-    query += " ORDER BY p.timestamp DESC LIMIT ? OFFSET ?"
+    query += " ORDER BY t.timestamp DESC LIMIT ? OFFSET ?"
     params.extend([per_page, offset])
 
     with get_conn() as conn:
@@ -108,8 +109,8 @@ def list_plates():
         # total count for pagination
         count_q = """
             SELECT COUNT(*)
-            FROM plates p
-            LEFT JOIN metadata m ON p.uuid = m.plate_uuid
+            FROM traffic t
+            JOIN plates p ON t.plate_uuid = p.uuid
             WHERE 1=1
         """
         count_params = []
@@ -117,10 +118,10 @@ def list_plates():
             count_q += " AND p.plate_text LIKE ?"
             count_params.append(f"%{plate_text}%")
         if start_ts:
-            count_q += " AND p.timestamp >= ?"
+            count_q += " AND t.timestamp >= ?"
             count_params.append(start_ts)
         if end_ts:
-            count_q += " AND p.timestamp <= ?"
+            count_q += " AND t.timestamp <= ?"
             count_params.append(end_ts)
         cur.execute(count_q, count_params)
         total = cur.fetchone()[0]
