@@ -199,7 +199,7 @@ def create_plate():
     return jsonify({"status": "created", "uuid": plate_uuid})
 
 
-@app.route("/plates/<string:plate_uuid>", methods=["PUT"])
+@app.route("/update/<string:plate_uuid>", methods=["PUT"])
 def update_plate(plate_uuid):
     try:
         data = request.json
