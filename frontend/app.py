@@ -219,10 +219,8 @@ def update_plate(plate_uuid):
 @app.route("/plates/<string:plate_uuid>", methods=["DELETE"])
 def delete_plate(plate_uuid):
     with get_conn() as conn:
-        conn.execute("DELETE FROM metadata WHERE plate_uuid = ?", (str(plate_uuid),))
-        conn.execute("DELETE FROM plates WHERE uuid = ?", (str(plate_uuid),))
+        conn.execute("DELETE FROM traffic WHERE plate_uuid = ?", (str(plate_uuid),))
         conn.commit()
-        # TODO delete the image file from disk as well.
     return jsonify({"status": "deleted"})
 
 
