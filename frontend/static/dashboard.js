@@ -820,3 +820,17 @@ document.addEventListener("keydown", (e) => {
 function updateTransform() {
   fsImg.style.transform = `translate(${offset.x}px, ${offset.y}px) scale(${fsScale})`;
 }
+
+// Video Preview Fullscreen
+const videoFeed = document.getElementById("videoFeed");
+const videoPreviewModal = document.getElementById("videoPreviewModal");
+const fullscreenVideoFeed = document.getElementById("fullscreenVideoFeed");
+
+videoFeed.addEventListener("click", () => {
+  fullscreenVideoFeed.src = videoFeed.src;
+  videoPreviewModal.style.display = "flex";
+});
+
+videoPreviewModal.addEventListener("click", () => {
+  videoPreviewModal.style.display = "none";
+});

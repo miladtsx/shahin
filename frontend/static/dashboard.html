@@ -223,10 +223,9 @@
         <div class="settings-container">
           <div class="video-preview-wrapper">
             <img id="videoFeed" src="" alt="Video Preview" />
+            <button class="button" id="hotZoneBtn">منطقه تشخیص</button>
             <!-- <p>وضعیت سرویس: <span id="backendStatus">نامشخص</span></p> -->
           </div>
-          <br />
-          <button class="button" id="hotZoneBtn">منطقه تشخیص</button>
           <div class="settings-form-wrapper">
             <div class="settings-form">
               <label
@@ -334,15 +333,6 @@
     <div id="hotZoneModal" class="modal">
       <div
         class="modal-content"
-        style="
-          position: relative;
-          width: 80%;
-          max-width: 1000px;
-          aspect-ratio: 16/9;
-          margin: auto;
-          top: 50%;
-          transform: translateY(-50%);
-        "
       >
         <span
           class="modal-close"
@@ -390,6 +380,11 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Video Preview Modal -->
+    <div id="videoPreviewModal" class="modal">
+      <img id="fullscreenVideoFeed" class="modal-content" style="max-width: 90%; max-height: 90%; background: none; box-shadow: none;" />
     </div>
 
     <script
