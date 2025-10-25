@@ -171,10 +171,10 @@ function confirmUpdatePlate(uuid) {
 
 // Delete Plate with Confirmation
 function confirmDeletePlate(uuid) {
-  showConfirm(`آیا از حذف پلاک ${uuid} مطمئنید؟`, async () => {
-    await fetch(`/plates/${uuid}`, { method: "DELETE" });
-    showToast("پلاک حذف شد");
-    fetchPlates();
+  showConfirm(`آیا تاریخچه این تردد برای همیشه حذف گردد؟`, async () => {
+    await fetch(`/traffic/${uuid}`, { method: "DELETE" });
+    showToast("تردد حذف شد");
+    fetchTraffic();
     closePlateImageModal();
   });
 }
@@ -270,7 +270,7 @@ async function submitAddPlate() {
   if (plate.length < 7) return showToast("پلاک ۸ رقم دارد", 2000);
 
   try {
-    const res = await fetch("/plates", {
+    const res = await fetch("/traffic", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

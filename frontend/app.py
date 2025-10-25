@@ -144,25 +144,47 @@ def list_plates():
     )
 
 
-@app.route("/plates", methods=["POST"])
+@app.route("/traffic", methods=["POST"])
 def create_plate():
     data = request.json
     plate_uuid = str(uuid.uuid4())
+    plate_text = data.get("plate_text")
+
+    # TODO validate input
+
+    if not plate_text:
+        return jsonify({"status": "error", "message": "Plate text is required"}), 400
+
     with get_conn() as conn:
+        # check if plate already exists
+        row = conn.execute(
+            "SELECT uuid FROM plates WHERE plate_text = ?", (plate_text,)
+        ).fetchone()
+
+        if row:
+            plate_uuid = row[0]
+        else:
+            plate_uuid = str(uuid.uuid4())
+            conn.execute(
+                "INSERT INTO plates (uuid, plate_text) VALUES (?, ?)",
+                (plate_uuid, plate_text),
+            )
+
+        # upsert metadata
         conn.execute(
-            "INSERT INTO plates (uuid, plate_text) VALUES (?, ?)",
+            """
+                INSERT INTO metadata (plate_uuid, car_type, car_color, car_owner)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(plate_uuid) DO UPDATE SET
+                    car_type=excluded.car_type,
+                    car_color=excluded.car_color,
+                    car_owner=excluded.car_owner
+            """,
             (
                 plate_uuid,
-                data["plate_text"],
-            ),
-        )
-        conn.execute(
-            "INSERT INTO metadata (plate_uuid, car_type, car_color, car_owner) VALUES (?, ?, ?, ?)",
-            (
-                plate_uuid,
-                data["car_type"],
-                data["car_color"],
-                data["car_owner"],
+                data.get("car_type"),
+                data.get("car_color"),
+                data.get("car_owner"),
             ),
         )
 
@@ -216,7 +238,7 @@ def update_plate(plate_uuid):
     return jsonify({"status": "updated"})
 
 
-@app.route("/plates/<string:plate_uuid>", methods=["DELETE"])
+@app.route("/traffic/<string:plate_uuid>", methods=["DELETE"])
 def delete_plate(plate_uuid):
     with get_conn() as conn:
         conn.execute("DELETE FROM traffic WHERE plate_uuid = ?", (str(plate_uuid),))
