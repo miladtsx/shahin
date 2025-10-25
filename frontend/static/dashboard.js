@@ -233,14 +233,6 @@ function restoreInputs() {
     document.getElementById("plate_text").value = saved.plate_text;
 }
 
-async function deletePlate(uuid) {
-  showConfirm(`پلاک ${uuid} برای همیشه حذف شود؟ مطمئنید؟`, async () => {
-    await fetch(`/plates/${uuid}`, { method: "DELETE" });
-    fetchPlates();
-    showToast("پلاک حذف شد", 5000);
-  });
-}
-
 function showToast(message) {
   let toast = document.getElementById("toast");
   toast.textContent = message;
