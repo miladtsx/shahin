@@ -7,7 +7,7 @@ from src.selector.best_frame_selector import OnlineBestFrameSelector
 from src.score.score import score_quality
 from src.tracker.sort.sort import Sort
 from src.common_utils.video_loader import VideoLoader
-from src.common_utils.config import Config
+from src.common_utils.config import Config, MyConfig
 from src.common_utils.app_logger import get_logger, log_duration
 from concurrent.futures import ThreadPoolExecutor
 from src.common_utils.resource_path import get_resource_path, get_data_path
@@ -19,7 +19,7 @@ logger = get_logger("detect", logfile="logs/app.jsonl")
 
 def run_plate_detection():
     """Main function that runs continuously, handling video input failures gracefully"""
-    conf = Config().config
+    conf: MyConfig = Config().config
     db = DB()
 
     # Initialize components
@@ -131,7 +131,7 @@ def run_plate_detection():
                     active_ids = (
                         set()
                     )  # TODO POST MVP remove and use the internal selector tracking
-                    show(draw_boxes(frame, tracked_vehicles), "Vehicle Tracked")
+                    # show(draw_boxes(frame, tracked_vehicles), "Vehicle Tracked")
                     # endregion
 
                     # region Selection

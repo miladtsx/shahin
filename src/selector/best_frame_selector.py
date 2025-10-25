@@ -6,6 +6,7 @@ from src.preprocessor.preprocessor import PlatePreprocessor
 from src.common_utils.app_logger import get_logger
 from src.common_utils.image_save import save
 from src.common_utils.debug_image import show, draw_boxes
+from src.common_utils.config import Config, MyConfig
 from dataclasses import dataclass
 import numpy as np
 from typing import Dict, List, Tuple
@@ -34,6 +35,7 @@ class OnlineBestFrameSelector:
     ):
         self.scorer = scorer
         self.db = db
+        self.config: MyConfig = Config().config
 
         self.top_plates: Dict[str, List[Tuple[float, int, FrameData]]] = {}
         self.top_fully_visible_vehicle: Dict[
@@ -207,7 +209,9 @@ class OnlineBestFrameSelector:
             last_frame = self.last_known_full_frame.get(vid)
             if last_frame is not None:
                 save(last_frame, vid, "failed_capture")
-                self.db.insert_plate(vid, "DETECTION_FAILED")
+                self.db.insert_plate(
+                    vid, "DETECTION_FAILED", self.config.get("camera_location")
+                )
             else:
                 # TODO real error that must be sent to dev team
                 # A car triggered detection but nothing is saved
@@ -249,7 +253,7 @@ class OnlineBestFrameSelector:
             logger.info(
                 f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Final plate: {plate_text}"
             )
-            self.db.insert_plate(vid, plate_text)
+            self.db.insert_plate(vid, plate_text, self.config.get("camera_location"))
 
         except Exception as e:
             logger.error(

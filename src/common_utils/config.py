@@ -11,6 +11,7 @@ class Point(TypedDict):
 
 
 class MyConfig(TypedDict):
+    camera_location: str
     video_path: str
     frame_skip: int
     car_detection_threshold: float
@@ -21,6 +22,7 @@ class MyConfig(TypedDict):
 
 
 DEFAULT_CONFIG: MyConfig = {
+    "camera_location": "تعیین نشده",
     "video_path": "rtsp://127.0.0.1:8554/live.stream",
     "frame_skip": 1,
     "car_detection_threshold": 0.6,

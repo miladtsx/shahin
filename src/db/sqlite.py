@@ -43,7 +43,7 @@ class DB:
                 CREATE TABLE IF NOT EXISTS traffic (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     plate_uuid TEXT NOT NULL,
-                    location TEXT,
+                    camera_location TEXT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
                 );
@@ -57,7 +57,7 @@ class DB:
         logger.info("db_stopped")
 
     def insert_plate(
-        self, vehicle_id: str, plate_text: str, location=None, metadata=None
+        self, vehicle_id: str, plate_text: str, camera_location=None, metadata=None
     ):
         try:
             cur = self._conn.cursor()
@@ -104,8 +104,8 @@ class DB:
 
             # insert traffic record
             cur.execute(
-                "INSERT INTO traffic (plate_uuid, location) VALUES (?, ?)",
-                (plate_uuid, location),
+                "INSERT INTO traffic (plate_uuid, camera_location) VALUES (?, ?)",
+                (plate_uuid, camera_location),
             )
             self._conn.commit()
         except Exception as e:
