@@ -422,9 +422,26 @@ async function loadSettings() {
     const response = await fetch("/settings");
     config = await response.json();
     for (const key in config) {
-      const input = document.getElementById(key);
-      if (input) {
-        input.value = config[key];
+      const el = document.getElementById(key);
+      if (!el) continue;
+
+      const value = config[key];
+
+      if (el.tagName === "INPUT") {
+        el.value = value;
+        // update slider display if range
+        if (
+          el.type === "range" &&
+          el.nextElementSibling?.tagName === "OUTPUT"
+        ) {
+          el.nextElementSibling.value = value;
+        }
+      } else if (el.tagName === "SELECT") {
+        el.value = value;
+      } else if (el.tagName === "OUTPUT") {
+        el.value = value;
+      } else {
+        el.textContent = value;
       }
     }
     updateVideoStream();
