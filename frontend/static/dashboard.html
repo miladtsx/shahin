@@ -27,77 +27,81 @@
         </div>
       </a>
 
-      <!-- Main Card -->
-      <div class="card">
-        <!-- Card Header -->
-        <div class="card-header">
-          <button class="button new-plate" onclick="openAddPlateModal()">
-            افزودن
-          </button>
-          <button class="button toggle-filter" onclick="toggleFilterBar()">
-            فیلتر
-          </button>
-          <button
-            class="button icon-button"
-            title="استخراج CSV"
-            onclick="exportCSV()"
-          >
-            ⬇️
-          </button>
-        </div>
-
-        <!-- Filter Bar -->
-        <div id="filterBar" class="filter-bar">
-          <div class="filter-buttons">
-            <input id="filterPlate" placeholder="جستجوی پلاک" />
-            <input id="filterStart" type="datetime-local" />
-            <input id="filterEnd" type="datetime-local" />
-            <button class="button apply-filter-btn" onclick="applyFilters()">
+      <div id="platesTableContainer">
+        <!-- Main Card -->
+        <div class="card">
+          <!-- Card Header -->
+          <div class="card-header">
+            <button class="button new-plate" onclick="openAddPlateModal()">
+              افزودن
+            </button>
+            <button class="button toggle-filter" onclick="toggleFilterBar()">
               فیلتر
             </button>
-            <button class="button clear-filter-btn" onclick="clearFilters()">
-              &times;
+            <button
+              class="button icon-button"
+              title="استخراج CSV"
+              onclick="exportCSV()"
+            >
+              ⬇️
             </button>
           </div>
-        </div>
 
-        <!-- Plates Table -->
-        <table>
-          <thead>
-            <tr>
-              <th>تصویر</th>
-              <th>شماره</th>
-              <th>زمان ثبت</th>
-              <th>موقعیت</th>
-            </tr>
-          </thead>
-          <tbody class="center-text" id="plates_body"></tbody>
-        </table>
-
-        <!-- Pagination -->
-        <div class="pagination-container">
-          <div class="per-page-select">
-            <label>
-              نمایش در هر صفحه:
-              <select id="perPageSelect" onchange="onPerPageChange()">
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="100">100</option>
-                <option value="200">200</option>
-              </select>
-            </label>
+          <!-- Filter Bar -->
+          <div id="filterBar" class="filter-bar">
+            <div class="filter-buttons">
+              <input id="filterPlate" placeholder="جستجوی پلاک" />
+              <input id="filterStart" type="datetime-local" />
+              <input id="filterEnd" type="datetime-local" />
+              <button class="button apply-filter-btn" onclick="applyFilters()">
+                فیلتر
+              </button>
+              <button class="button clear-filter-btn" onclick="clearFilters()">
+                &times;
+              </button>
+            </div>
           </div>
 
-          <span id="totalRowsInfo" style="margin: 0 10px"></span>
+          <!-- Plates Table -->
+          <div class="table-wrapper">
+            <table id="platesTable">
+              <thead>
+                <tr>
+                  <th>تصویر</th>
+                  <th>شماره</th>
+                  <th>زمان ثبت</th>
+                  <th>موقعیت</th>
+                </tr>
+              </thead>
+              <tbody class="center-text" id="plates_body"></tbody>
+            </table>
+          </div>
 
-          <div class="pagination-controls">
-            <button class="button" id="nextPageBtn" onclick="changePage(1)">
-              بعدی
-            </button>
-            <span id="pageInfo">صفحه 1</span>
-            <button class="button" id="prevPageBtn" onclick="changePage(-1)">
-              قبلی
-            </button>
+          <!-- Pagination -->
+          <div class="pagination-container">
+            <div class="per-page-select">
+              <label>
+                نمایش در هر صفحه:
+                <select id="perPageSelect" onchange="onPerPageChange()">
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="100">100</option>
+                  <option value="200">200</option>
+                </select>
+              </label>
+            </div>
+
+            <span id="totalRowsInfo" style="margin: 0 10px"></span>
+
+            <div class="pagination-controls">
+              <button class="button" id="nextPageBtn" onclick="changePage(1)">
+                بعدی
+              </button>
+              <span id="pageInfo">صفحه 1</span>
+              <button class="button" id="prevPageBtn" onclick="changePage(-1)">
+                قبلی
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -300,7 +304,10 @@
                 >آستانه ابعاد برش پلاک:</label
               >
               <div class="slider-container">
-                <select id="crop_dimension_threshold" name="crop_dimension_threshold">
+                <select
+                  id="crop_dimension_threshold"
+                  name="crop_dimension_threshold"
+                >
                   <option value="2500">بالا (2500)</option>
                   <option value="2000" selected>متوسط (2000)</option>
                   <option value="1000">پایین (1000)</option>
