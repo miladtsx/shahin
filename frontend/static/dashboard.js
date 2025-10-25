@@ -17,7 +17,7 @@ async function fetchPlates(query = "") {
         end_ts: CURRENT_FILTERS.end_ts || "",
       }).toString();
 
-  const res = await fetch(`/plates?${qs}`);
+  const res = await fetch(`/traffic?${qs}`);
   const payload = await res.json();
   const data = payload.items || payload;
   const meta = payload.meta || {
@@ -70,12 +70,12 @@ async function fetchPlates(query = "") {
     `;
     tr.appendChild(tsTd);
 
-    // Actions cell
+    // Location cell
     const actTd = document.createElement("td");
-    actTd.className = "actions";
+    actTd.className = "location";
     actTd.innerHTML = `
     <div class="action-buttons">
-      <button class="button btn-delete" onclick="deletePlate('${p.uuid}')">حذف</button>
+      <label >${p.location}</label>
     </div>
     `;
     tr.appendChild(actTd);
@@ -305,14 +305,20 @@ function createPlateComponent(plateText, plateId) {
   const container = document.createElement("div");
   container.className = "plate-component";
 
-  [...plateText].reverse().forEach((char, idx) => {
+  if (plateText == "DETECTION_FAILED") {
     const input = document.createElement("label");
-    input.textContent = toFarsiNumber(char);
-    input.dataset.charIndex = idx;
-    input.dataset.plateId = plateId;
-    input.className = "plate-glyph";
+    input.textContent = "شناسایی ناموفق";
     container.appendChild(input);
-  });
+  } else {
+    [...plateText].reverse().forEach((char, idx) => {
+      const input = document.createElement("label");
+      input.textContent = toFarsiNumber(char);
+      input.dataset.charIndex = idx;
+      input.dataset.plateId = plateId;
+      input.className = "plate-glyph";
+      container.appendChild(input);
+    });
+  }
 
   return container;
 }

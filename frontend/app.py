@@ -65,7 +65,7 @@ def serve_out_tiny_plate(uuid, tag):
     return send_from_directory(base_dir, f"{tag}.jpg")
 
 
-@app.route("/plates", methods=["GET"])
+@app.route("/traffic", methods=["GET"])
 def list_plates():
     # pagination
     try:
@@ -334,7 +334,7 @@ def backend_status():
 
 
 def run_app():
-    app.run(port=PORT, debug=False, use_reloader=True)
+    app.run(port=PORT, debug=True)
 
 
 if __name__ == "__main__":
