@@ -53,10 +53,10 @@
               <input id="filterPlate" placeholder="جستجوی پلاک" />
               <input id="filterStart" type="datetime-local" />
               <input id="filterEnd" type="datetime-local" />
-              <button class="button apply-filter-btn" onclick="applyFilters()">
+              <button class="button green-btn" onclick="applyFilters()">
                 فیلتر
               </button>
-              <button class="button clear-filter-btn" onclick="clearFilters()">
+              <button class="button red-btn" onclick="clearFilters()">
                 &times;
               </button>
             </div>
@@ -132,15 +132,12 @@
         <div class="modal-actions">
           <button
             id="submitBtn"
-            class="button new-plate"
-            onclick="submitAddPlate()"
+            class="button green-btn"
+            onclick="submitAddManualTraffic()"
           >
             ثبت
           </button>
-          <button
-            class="button clear-filter-btn"
-            onclick="closeAddPlateModal()"
-          >
+          <button class="button red-btn" onclick="closeAddPlateModal()">
             لغو
           </button>
         </div>
@@ -197,14 +194,14 @@
         <div class="modal-actions">
           <button
             id="confirmYes"
-            class="button new-plate"
+            class="button red-btn"
             onclick="submitAddPlate()"
           >
             بله
           </button>
           <button
             id="confirmNo"
-            class="button clear-filter-btn"
+            class="button green-btn"
             onclick="closeAddPlateModal()"
           >
             خیر
@@ -315,13 +312,10 @@
           </div>
         </div>
         <div class="modal-actions">
-          <button class="button new-plate" onclick="saveSettings()">
+          <button class="button red-btn" onclick="saveSettings()">
             ذخیره و راه‌اندازی مجدد
           </button>
-          <button
-            class="button clear-filter-btn"
-            onclick="closeSettingsModal()"
-          >
+          <button class="button green-btn" onclick="closeSettingsModal()">
             لغو
           </button>
         </div>
@@ -330,9 +324,7 @@
 
     <!-- Hot Zone Modal -->
     <div id="hotZoneModal" class="modal">
-      <div
-        class="modal-content"
-      >
+      <div class="modal-content">
         <span
           class="modal-close"
           onclick="HotZone.close()"
@@ -373,8 +365,8 @@
             z-index: 10;
           "
         >
-          <button class="button new-plate" onclick="HotZone.save()">ثبت</button>
-          <button class="button clear-filter-btn" onclick="HotZone.close()">
+          <button class="button red-btn" onclick="HotZone.save()">ثبت</button>
+          <button class="button green-btn" onclick="HotZone.close()">
             لغو
           </button>
         </div>

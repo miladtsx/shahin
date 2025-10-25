@@ -1,4 +1,4 @@
-window.onload = fetchPlates;
+window.onload = fetchTraffic;
 
 let CURRENT_PAGE = 1;
 let CURRENT_PER_PAGE = 5;
@@ -6,7 +6,7 @@ let TOTAL_PAGES = 0;
 let CURRENT_FILTERS = {}; // keep filters for export and paging
 
 // CRUD
-async function fetchPlates(query = "") {
+async function fetchTraffic(query = "") {
   const qs = query
     ? query
     : new URLSearchParams({
@@ -89,16 +89,16 @@ function onPerPageChange() {
     10
   );
   CURRENT_PAGE = 1;
-  fetchPlates();
+  fetchTraffic();
 }
 
 function changePage(delta) {
   if (CURRENT_PAGE < TOTAL_PAGES && delta > 0) {
     CURRENT_PAGE++;
-    fetchPlates();
+    fetchTraffic();
   } else if (CURRENT_PAGE > 1 && delta < 0) {
     CURRENT_PAGE--;
-    fetchPlates();
+    fetchTraffic();
   }
 }
 
@@ -115,8 +115,8 @@ function openPlateImageModal(src, plateData) {
   <p><strong>صاحب خودرو:</strong> <input class="center-text" id="editCarOwner" value="${plateData.car_owner}"></p>
     </div>
     <div class="modal-actions">
-      <button class="button new-plate" onclick="confirmUpdatePlate('${plateData.uuid}')">بروزرسانی</button>
-      <button class="button btn-delete" onclick="confirmDeletePlate('${plateData.uuid}')">حذف</button>
+      <button class="button green-btn" onclick="confirmUpdatePlate('${plateData.uuid}')">بروزرسانی</button>
+      <button class="button red-btn" onclick="confirmDeletePlate('${plateData.uuid}')">حذف</button>
     </div>
   `;
 
@@ -164,7 +164,7 @@ function confirmUpdatePlate(uuid) {
       }),
     });
     showToast("پلاک بروزرسانی شد");
-    fetchPlates();
+    fetchTraffic();
     closePlateImageModal();
   });
 }
@@ -259,7 +259,7 @@ function closeAddPlateModal() {
   document.getElementById("modal_car_owner").value = "";
 }
 
-async function submitAddPlate() {
+async function submitAddManualTraffic() {
   const plate = document.getElementById("modal_plate_text").value;
   const carType = document.getElementById("modal_car_type").value;
   const carColor = document.getElementById("modal_car_color").value;
@@ -282,12 +282,12 @@ async function submitAddPlate() {
       }),
     });
     const data = await res.json();
-    showToast("پلاک با موفقیت افزوده شد");
+    showToast("تردد با موفقیت افزوده شد");
     closeAddPlateModal();
-    fetchPlates();
+    fetchTraffic();
   } catch (e) {
     console.error(e);
-    showToast("خطا در افزودن پلاک");
+    showToast("خطا در ثبت تردد");
   }
 }
 
@@ -369,7 +369,7 @@ function applyFilters() {
     params.append("end_ts", end);
   }
 
-  fetchPlates(params.toString());
+  fetchTraffic(params.toString());
 }
 
 function clearFilters() {
@@ -378,7 +378,7 @@ function clearFilters() {
   document.getElementById("filterEnd").value = "";
   CURRENT_FILTERS = {};
   toggleFilterBar();
-  fetchPlates();
+  fetchTraffic();
 }
 
 // export CSV using current filters
@@ -395,7 +395,7 @@ function exportCSV() {
 // initial load
 window.onload = () => {
   document.getElementById("perPageSelect").value = String(CURRENT_PER_PAGE);
-  fetchPlates();
+  fetchTraffic();
 };
 
 document

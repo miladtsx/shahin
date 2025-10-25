@@ -91,13 +91,24 @@ main {
   font-family: "Vazirmatn-Regular", sans-serif;
 }
 
-.button.new-plate {
+.button.green-btn {
   background-color: #28a745;
   color: white;
 }
 
-.button.new-plate:hover {
+.button.green-btn:hover {
   background-color: #218838;
+  transform: translateY(-2px);
+}
+
+
+.button.red-btn {
+  background-color: #dc3545;
+  color: white;
+}
+
+.button.red-btn:hover {
+  background-color: #c82333;
   transform: translateY(-2px);
 }
 
@@ -316,6 +327,7 @@ td img:hover {
 /* Toast Notification */
 #toast {
   visibility: hidden;
+  opacity: 0;
   min-width: 250px;
   background-color: #333;
   color: #fff;
@@ -323,17 +335,17 @@ td img:hover {
   border-radius: 8px;
   padding: 16px;
   position: fixed;
-  z-index: 1;
+  z-index: 1000000;
   left: 50%;
-  bottom: 30px;
+  top: 30px;
   transform: translateX(-50%);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  transition: opacity 0.3s ease-in-out, visibility 0.3s;
 }
 
 #toast.show {
   visibility: visible;
-  -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
-  animation: fadein 0.5s, fadeout 0.5s 2.5s;
+  opacity: 1;
 }
 
 @-webkit-keyframes fadein {
