@@ -303,9 +303,17 @@ def restart_backend():
 def settings():
     config_path = get_config_path()
     if request.method == "POST":
-        new_config = request.json
+        new_config = request.json or {}
+        try:
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            config = {}
+
+        config.update(new_config)
+
         with open(config_path, "w") as f:
-            yaml.safe_dump(new_config, f)
+            yaml.safe_dump(config, f)
 
         restart_backend()
         return jsonify({"status": "در حال اجرا با تنظیمات جدید"})
@@ -313,8 +321,7 @@ def settings():
     # GET
     try:
         with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
-            return jsonify(config)
+            return jsonify(yaml.safe_load(f) or {})
     except FileNotFoundError:
         return jsonify({"error": "تنظیمات یافت نشد -- شاهین را مجدد تمیز اجرا نمایید"})
 
