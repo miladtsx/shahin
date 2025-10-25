@@ -165,6 +165,14 @@ def create_plate():
                 data["car_owner"],
             ),
         )
+
+        # insert traffic record
+        camera_location = data.get("camera_location")
+        if camera_location:
+            conn.execute(
+                "INSERT INTO traffic (plate_uuid, location) VALUES (?, ?)",
+                (plate_uuid, camera_location),
+            )
         conn.commit()
     return jsonify({"status": "created", "uuid": plate_uuid})
 
@@ -190,6 +198,18 @@ def update_plate(plate_uuid):
                     data.get("car_owner"),
                 ),
             )
+            # TODO in post MVP when the system supports multiple camera sources,
+            # we should filter by traffic id to update camera location.
+            camera_location = data.get("camera_location")
+            if camera_location:
+                conn.execute(
+                    """
+                        UPDATE traffic
+                        SET camera_location = ?
+                        WHERE plate_uuid = ?
+                    """,
+                    (plate_uuid, camera_location),
+                )
             conn.commit()
     except Exception as e:
         return jsonify({"status": f"Error: {str(e)}"})

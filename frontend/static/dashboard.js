@@ -150,7 +150,9 @@ function confirmUpdatePlate(uuid) {
     const newCarType = document.getElementById("editCarType").value;
     const newCarColor = document.getElementById("editCarColor").value;
     const newCarOwner = document.getElementById("editCarOwner").value;
-    await fetch(`/plates/${uuid}`, {
+    const newCameraLocation =
+      document.getElementById("editCameraLocation").value;
+    await fetch(`/update/${uuid}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -158,6 +160,7 @@ function confirmUpdatePlate(uuid) {
         car_type: newCarType,
         car_color: newCarColor,
         car_owner: newCarOwner,
+        camera_location: newCameraLocation,
       }),
     });
     showToast("پلاک بروزرسانی شد");
@@ -261,6 +264,9 @@ async function submitAddPlate() {
   const carType = document.getElementById("modal_car_type").value;
   const carColor = document.getElementById("modal_car_color").value;
   const carOwner = document.getElementById("modal_car_owner").value;
+  const camera_location = document.getElementById(
+    "modal_camera_location"
+  ).value;
   if (plate.length < 7) return showToast("پلاک ۸ رقم دارد", 2000);
 
   try {
@@ -272,6 +278,7 @@ async function submitAddPlate() {
         car_type: carType,
         car_color: carColor,
         car_owner: carOwner,
+        camera_location: camera_location,
       }),
     });
     const data = await res.json();
