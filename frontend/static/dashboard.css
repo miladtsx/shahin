@@ -236,7 +236,7 @@ tbody tr:hover {
 td img {
   width: 300px;
   height: 75px;
-  object-fit: cover;
+  object-fit: fill;
   border-radius: 4px;
   cursor: zoom-in;
   transition: transform 0.2s ease;
