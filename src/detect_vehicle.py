@@ -196,6 +196,7 @@ def run_plate_detection():
                     # endregion
 
                 except Exception as e:
+                    logger.error(f"Error processing frame {frame_index}: {e}")
                     continue
             # endregion
         # region Graceful Exit Handling
