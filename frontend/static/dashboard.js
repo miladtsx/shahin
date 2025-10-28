@@ -38,24 +38,24 @@ async function fetchTraffic(query = "") {
   const tbody = document.getElementById("plates_body");
   tbody.innerHTML = "";
 
-  data.forEach((p) => {
+  data.forEach((t) => {
     const tr = document.createElement("tr");
 
     const imgTd = document.createElement("td");
-    imgTd.innerHTML = `<img src="/tiny_plate_image/${p.uuid}/plate" 
+    imgTd.innerHTML = `<img src="/tiny_plate_image/${t.uuid}/plate" 
     onclick='openPlateImageModal("/plate_image/${
-      p.uuid
-    }/original", ${JSON.stringify(p).replace(/"/g, "&quot;")})'>`;
+      t.uuid
+    }/original", ${JSON.stringify(t).replace(/"/g, "&quot;")})'>`;
     tr.appendChild(imgTd);
 
     // Plate glyphs cell
     const plateTd = document.createElement("td");
-    plateTd.appendChild(createPlateComponent(p.plate_text, p.uuid));
+    plateTd.appendChild(createPlateComponent(t.plate_text, t.uuid));
     tr.appendChild(plateTd);
 
     // Timestamp cell
     const tsTd = document.createElement("td");
-    const date = new Date(p.timestamp);
+    const date = new Date(t.timestamp);
     const tehranTime = date.toLocaleString("fa-IR", {
       timeZone: "Asia/Tehran",
       hour12: false,
@@ -72,10 +72,10 @@ async function fetchTraffic(query = "") {
 
     // Location cell
     const actTd = document.createElement("td");
-    actTd.className = "location";
+    actTd.className = "camera_location";
     actTd.innerHTML = `
     <div class="action-buttons">
-      <label >${p.location}</label>
+      <label >${t.camera_location}</label>
     </div>
     `;
     tr.appendChild(actTd);
@@ -461,6 +461,7 @@ async function loadSettings() {
 async function saveSettings() {
   const config = {
     video_path: document.getElementById("video_path").value,
+    camera_location: document.getElementById("camera_location").value,
     frame_skip: parseInt(document.getElementById("frame_skip").value),
     car_detection_threshold: parseFloat(
       document.getElementById("car_detection_threshold").value

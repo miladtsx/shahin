@@ -80,7 +80,7 @@ def list_plates():
     end_ts = request.args.get("end_ts")
 
     query = """
-    SELECT p.uuid, p.plate_text, t.timestamp,
+    SELECT p.uuid, p.plate_text, t.timestamp, t.camera_location,
         m.car_type, m.car_color, m.car_owner
     FROM traffic t
     JOIN plates p ON t.plate_uuid = p.uuid
@@ -133,9 +133,10 @@ def list_plates():
                     "uuid": r[0],
                     "plate_text": r[1],
                     "timestamp": r[2],
-                    "car_type": r[3],
-                    "car_color": r[4],
-                    "car_owner": r[5],
+                    "camera_location": r[3],
+                    "car_type": r[4],
+                    "car_color": r[5],
+                    "car_owner": r[6],
                 }
                 for r in rows
             ],
