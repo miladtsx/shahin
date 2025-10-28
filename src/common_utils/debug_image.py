@@ -10,7 +10,7 @@ def show(img, title="debug"):
     cv2.waitKey(1)
 
 
-def draw_boxes(frame, detections, color=(0, 255, 0), label="obj"):
+def draw_boxes(frame, detections, label="obj", color=(0, 255, 0)):
     """
     detections: list of dicts with 'bbox' and optional 'conf'
     bbox format: (x1, y1, x2, y2)
@@ -18,8 +18,8 @@ def draw_boxes(frame, detections, color=(0, 255, 0), label="obj"):
     for det in detections:
         x1, y1, x2, y2 = map(int, det["bbox"])
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-        txt = f"{det['id'][:3]}"
+        vid = det.get("id")
+        txt = f"{(vid and vid[:3]) or label}"
         if "conf" in det:
             txt += f" {det['conf']:.2f}"
 
