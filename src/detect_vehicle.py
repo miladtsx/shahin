@@ -60,11 +60,19 @@ def run_plate_detection():
             frame_index = 0
 
             frame_skip = max(conf.get("frame_skip", 1), 1)  # always ≥1
+            rotation_angle = float(conf.get("rotation_angle", 0) or 0)
 
             logger.info("Starting video processing...")
             # region Processing
             for frame in loader:
                 try:
+                    if frame is None:
+                        logger.warning("Empty frame received from loader")
+                        continue
+
+                    if rotation_angle:
+                        frame = rotate_frame(frame, rotation_angle)
+
                     # region Validate
                     if not frame.any() or frame.mean() < 5:  # near black
                         logger.warning("Black frame detected, camera may be dead")
@@ -131,7 +139,7 @@ def run_plate_detection():
                     active_ids = (
                         set()
                     )  # TODO POST MVP remove and use the internal selector tracking
-                    # show(draw_boxes(frame, tracked_vehicles), "Vehicle Tracked")
+                    # show(draw_boxes(frame.copy(), tracked_vehicles), "Vehicle Tracked")
                     # endregion
 
                     # region Selection
@@ -217,6 +225,24 @@ def run_plate_detection():
 
 
 # Shrink box by a fixed margin percentage
+def rotate_frame(frame: np.ndarray, angle: float) -> np.ndarray:
+    """Rotate frame around its center, keeping original dimensions."""
+    if not angle:
+        return frame
+
+    (h, w) = frame.shape[:2]
+    center = (w / 2, h / 2)
+    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(
+        frame,
+        rotation_matrix,
+        (w, h),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REPLICATE,
+    )
+    return rotated
+
+
 def shrink_box(x1, y1, x2, y2, shrink_ratio=0.5):
     w = x2 - x1
     h = y2 - y1

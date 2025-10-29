@@ -291,12 +291,6 @@ async function submitAddManualTraffic() {
   }
 }
 
-// Close modal if clicking outside modal_content
-window.onclick = function (event) {
-  const modal = document.getElementById("addPlateModal");
-  if (event.target == modal) modal.style.display = "none";
-};
-
 // Add plate modal
 
 // plate component
@@ -338,6 +332,12 @@ window.onclick = function (event) {
 
   const confirmModal = document.getElementById("confirmModal");
   if (event.target == confirmModal) confirmModal.style.display = "none";
+
+  const rotationModal = document.getElementById("rotationModal");
+  if (event.target == rotationModal) Rotation.close();
+
+  const hotZoneModal = document.getElementById("hotZoneModal");
+  if (event.target == hotZoneModal) HotZone.close();
 };
 
 // Filtering
@@ -452,6 +452,7 @@ async function loadSettings() {
       }
     }
     updateVideoStream();
+    applyRotation(config.rotation_angle || 0);
     checkBackendStatus();
   } catch (error) {
     console.error("Error loading settings:", error);
@@ -459,7 +460,7 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
-  const config = {
+  const newConfig = {
     video_path: document.getElementById("video_path").value,
     camera_location: document.getElementById("camera_location").value,
     frame_skip: parseInt(document.getElementById("frame_skip").value),
@@ -472,17 +473,41 @@ async function saveSettings() {
     crop_dimension_threshold: parseInt(
       document.getElementById("crop_dimension_threshold").value
     ),
+    rotation_angle: Number(
+      document.getElementById("rotation_angle").value || 0
+    ),
   };
 
   await fetch("/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(config),
+    body: JSON.stringify({ ...config, ...newConfig }),
   });
+
+  config = { ...config, ...newConfig };
+  applyRotation(newConfig.rotation_angle);
 
   showToast("در حال راه‌اندازی مجدد با تنظیمات جدید");
   setTimeout(checkBackendStatus, 2000); // Check status after a delay
   closeSettingsModal();
+}
+
+function applyRotation(angle) {
+  const numeric = Number(angle) || 0;
+  const transformValue = numeric ? `rotate(${numeric}deg)` : "none";
+  const elements = [
+    document.getElementById("videoFeed"),
+    document.getElementById("rotationImage"),
+  ];
+  elements.forEach((el) => {
+    if (el) el.style.transform = transformValue;
+  });
+  const overlay = document.getElementById("rotationOverlay");
+  if (overlay) {
+    overlay.style.transform = numeric
+      ? `translate(-50%, -50%) rotate(${numeric}deg)`
+      : "translate(-50%, -50%)";
+  }
 }
 
 function updateVideoStream() {
@@ -510,9 +535,6 @@ async function checkBackendStatus() {
 }
 
 window.addEventListener("load", () => {
-  // Load settings on page load if you want to pre-populate or check status
-  // loadSettings();
-
   // Check backend status periodically
   setInterval(checkBackendStatus, 5000);
 
@@ -522,10 +544,8 @@ window.addEventListener("load", () => {
   if (videoWrapper && videoFeed) {
     videoWrapper.addEventListener("dblclick", () => {
       if (!videoWrapper.classList.contains("fullscreen")) {
-        // Enter fullscreen on double-click
         videoWrapper.classList.add("fullscreen");
       } else {
-        // Exit fullscreen on double-click
         videoWrapper.classList.remove("fullscreen");
         updateVideoStream(); // Resume stream with new timestamp
       }
@@ -533,17 +553,111 @@ window.addEventListener("load", () => {
   }
 });
 
-function updateVideoStream() {
-  const videoPath = document.getElementById("video_path").value;
-  const videoFeed = document.getElementById("videoFeed");
-  if (videoPath) {
-    videoFeed.src = `/video_feed?url=${encodeURIComponent(
-      videoPath
-    )}&t=${new Date().getTime()}`;
-  } else {
-    videoFeed.src = "";
+// #region Rotation Module
+const Rotation = (() => {
+  const modal = document.getElementById("rotationModal");
+  const previewImage = document.getElementById("rotationImage");
+  const slider = document.getElementById("rotationSlider");
+  const input = document.getElementById("rotationInput");
+  const overlay = document.getElementById("rotationOverlay");
+  let currentAngle = 0;
+
+  const clamp = (value) => {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return 0;
+    return Math.max(-180, Math.min(180, Math.round(numeric)));
+  };
+
+  const updatePreview = (angle) => {
+    if (previewImage) {
+      previewImage.style.transform = angle ? `rotate(${angle}deg)` : "none";
+    }
+    if (overlay) {
+      overlay.style.transform = angle
+        ? `translate(-50%, -50%) rotate(${angle}deg)`
+        : "translate(-50%, -50%)";
+    }
+  };
+
+  const syncControls = (value) => {
+    currentAngle = clamp(value);
+    if (slider) slider.value = currentAngle;
+    if (input) input.value = currentAngle;
+    updatePreview(currentAngle);
+    return currentAngle;
+  };
+
+  const getPersistedAngle = () =>
+    clamp(document.getElementById("rotation_angle")?.value || config.rotation_angle || 0);
+
+  const setPreviewSource = () => {
+    if (!previewImage) return;
+    const feedSrc = document.getElementById("videoFeed")?.src;
+    if (feedSrc) {
+      previewImage.src = feedSrc;
+    } else {
+      previewImage.src = "/static/plate_raw.jpg";
+    }
+  };
+
+  function open() {
+    if (!modal) return;
+    setPreviewSource();
+    syncControls(getPersistedAngle());
+    modal.style.display = "flex";
   }
-}
+
+  function close() {
+    if (modal) modal.style.display = "none";
+  }
+
+  function updateFromSlider(value) {
+    syncControls(value);
+  }
+
+  function updateFromInput(value) {
+    syncControls(value);
+  }
+
+  async function save() {
+    const angle = currentAngle;
+    const cfg = { ...config, rotation_angle: angle };
+
+    try {
+      await fetch("/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cfg),
+      });
+      config = cfg;
+      const angleInput = document.getElementById("rotation_angle");
+      if (angleInput) angleInput.value = angle;
+      applyRotation(angle);
+      showToast("زاویه چرخش به‌روزرسانی شد");
+      close();
+    } catch (error) {
+      console.error("Error saving rotation:", error);
+      showToast("خطا در ذخیره زاویه چرخش");
+    }
+  }
+
+  function handleManualInput(value) {
+    const angle = syncControls(value);
+    const angleInput = document.getElementById("rotation_angle");
+    if (angleInput) angleInput.value = angle;
+    applyRotation(angle);
+  }
+
+  return {
+    open,
+    close,
+    save,
+    updateFromSlider,
+    updateFromInput,
+    handleManualInput,
+  };
+})();
+// #endregion
 
 // #region Hot Zone Module
 const HotZone = (() => {

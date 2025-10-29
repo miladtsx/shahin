@@ -218,7 +218,16 @@
         <div class="settings-container">
           <div class="video-preview-wrapper">
             <img id="videoFeed" src="" alt="Video Preview" />
-            <button class="button" id="hotZoneBtn">منطقه تشخیص</button>
+            <div class="preview-actions">
+              <button class="button" id="hotZoneBtn">منطقه تشخیص</button>
+              <button
+                class="button secondary-btn"
+                id="rotationBtn"
+                onclick="Rotation.open()"
+              >
+                چرخش تصویر
+              </button>
+            </div>
             <!-- <p>وضعیت سرویس: <span id="backendStatus">نامشخص</span></p> -->
           </div>
           <div class="settings-form-wrapper">
@@ -235,7 +244,6 @@
                 name="video_path"
                 oninput="updateVideoStream()"
               />
-
               <label for="camera_location" title="موقعیت دوربین"
                 >موقعیت دوربین:</label
               >
@@ -380,6 +388,54 @@
           <button class="button green-btn" onclick="HotZone.close()">
             لغو
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rotation Modal -->
+    <div id="rotationModal" class="modal">
+      <div class="modal-content rotation-modal">
+        <span class="modal-close" onclick="Rotation.close()">&times;</span>
+        <h3>تنظیم زاویه چرخش</h3>
+        <div class="rotation-body">
+          <div class="rotation-preview">
+            <div class="rotation-stage">
+              <img id="rotationImage" />
+              <div class="rotation-overlay" id="rotationOverlay"></div>
+            </div>
+          </div>
+          <div class="rotation-panel">
+            <div class="rotation-controls">
+              <label for="rotationSlider">زاویه (درجه):</label>
+              <input
+                type="range"
+                id="rotationSlider"
+                min="-180"
+                max="180"
+                step="1"
+                value="0"
+                oninput="Rotation.updateFromSlider(this.value)"
+              />
+              <input
+                type="number"
+                id="rotationInput"
+                min="-180"
+                max="180"
+                step="1"
+                value="0"
+                dir="ltr"
+                oninput="Rotation.updateFromInput(this.value)"
+              />
+            </div>
+            <div class="modal-actions rotation-actions">
+              <button class="button red-btn" onclick="Rotation.save()">
+                ثبت
+              </button>
+              <button class="button green-btn" onclick="Rotation.close()">
+                لغو
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

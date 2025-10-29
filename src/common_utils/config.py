@@ -19,6 +19,7 @@ class MyConfig(TypedDict):
     crop_dimension_threshold: int
     hot_zone: List[Point]
     track_expiry: int  # Frames until car tracking expires
+    rotation_angle: float
 
 
 DEFAULT_CONFIG: MyConfig = {
@@ -35,6 +36,7 @@ DEFAULT_CONFIG: MyConfig = {
         {"x": 0.25, "y": 0.75},
     ],
     "track_expiry": 120,
+    "rotation_angle": 0,
 }
 
 
