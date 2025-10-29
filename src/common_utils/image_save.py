@@ -7,13 +7,13 @@ def save_debug(image, filename, tag):
     cv2.imwrite(f"debug/segmentation/{filename}/{tag}.jpg", image)
 
 
-def save(image, vid, tag):
+def save(image, vid, file_name, path=None):
     """
     Save image in user directory
     """
-    file_path = f"{get_data_path("out")}/{vid}/"
+    file_path = path or f"{get_data_path("out")}/{vid}/"
     try:
         os.makedirs(file_path, exist_ok=True)
-        cv2.imwrite(os.path.join(file_path, f"{tag}.jpg"), image)
+        cv2.imwrite(os.path.join(file_path, f"{file_name}.jpg"), image)
     except Exception as e:
         print(f"Error saving image {file_path}: {e}")
