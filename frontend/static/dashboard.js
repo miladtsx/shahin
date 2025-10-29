@@ -245,6 +245,27 @@ function showToast(message) {
   }, 2500);
 }
 
+let loadingCounter = 0;
+function showLoading(message = "در حال ذخیره...") {
+  const overlay = document.getElementById("loadingOverlay");
+  const messageEl = document.getElementById("loadingMessage");
+  if (!overlay || !messageEl) return;
+
+  loadingCounter += 1;
+  messageEl.textContent = message;
+  overlay.classList.add("active");
+}
+
+function hideLoading() {
+  const overlay = document.getElementById("loadingOverlay");
+  if (!overlay) return;
+
+  loadingCounter = Math.max(loadingCounter - 1, 0);
+  if (loadingCounter === 0) {
+    overlay.classList.remove("active");
+  }
+}
+
 // Add plate modal
 function openAddPlateModal() {
   document.getElementById("addPlateModal").style.display = "flex";
@@ -473,23 +494,26 @@ async function saveSettings() {
     crop_dimension_threshold: parseInt(
       document.getElementById("crop_dimension_threshold").value
     ),
-    rotation_angle: Number(
-      document.getElementById("rotation_angle").value || 0
-    ),
   };
 
-  await fetch("/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...config, ...newConfig }),
-  });
+  showLoading("در حال ذخیره تنظیمات...");
+  try {
+    await fetch("/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...config, ...newConfig }),
+    });
 
-  config = { ...config, ...newConfig };
-  applyRotation(newConfig.rotation_angle);
-
-  showToast("در حال راه‌اندازی مجدد با تنظیمات جدید");
-  setTimeout(checkBackendStatus, 2000); // Check status after a delay
-  closeSettingsModal();
+    config = { ...config, ...newConfig };
+    applyRotation(newConfig.rotation_angle);
+debugger
+    closeSettingsModal();
+  } catch (error) {
+    console.error("Error saving settings:", error);
+    showToast("خطا در ذخیره تنظیمات");
+  } finally {
+    hideLoading();
+  }
 }
 
 function applyRotation(angle) {
@@ -623,6 +647,7 @@ const Rotation = (() => {
     const angle = currentAngle;
     const cfg = { ...config, rotation_angle: angle };
 
+    showLoading("در حال ذخیره زاویه چرخش...");
     try {
       await fetch("/settings", {
         method: "POST",
@@ -638,6 +663,8 @@ const Rotation = (() => {
     } catch (error) {
       console.error("Error saving rotation:", error);
       showToast("خطا در ذخیره زاویه چرخش");
+    } finally {
+      hideLoading();
     }
   }
 
@@ -803,17 +830,29 @@ const HotZone = (() => {
     draw();
   }
 
-  function save() {
+  async function save() {
     const normalized = polygon.map((p) => ({
       x: p.x / canvas.width,
       y: p.y / canvas.height,
     }));
     const cfg = { ...config, hot_zone: normalized };
-    return fetch("/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cfg),
-    }).then(close);
+
+    showLoading("در حال ذخیره منطقه تشخیص...");
+    try {
+      await fetch("/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cfg),
+      });
+      config = cfg;
+      showToast("منطقه تشخیص ذخیره شد");
+      close();
+    } catch (error) {
+      console.error("Error saving hot zone:", error);
+      showToast("خطا در ذخیره منطقه تشخیص");
+    } finally {
+      hideLoading();
+    }
   }
 
   function defaultPolygon() {

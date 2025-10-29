@@ -109,6 +109,12 @@
 
     <!-- Toast -->
     <div id="toast"></div>
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <span id="loadingMessage">در حال ذخیره...</span>
+      </div>
+    </div>
 
     <!-- Image Modal -->
     <div id="imgModal" class="modal" onclick="closePlateImageModal()">
@@ -332,7 +338,7 @@
         </div>
         <div class="modal-actions">
           <button class="button red-btn" onclick="saveSettings()">
-            ذخیره و راه‌اندازی مجدد
+            ثبت
           </button>
           <button class="button green-btn" onclick="closeSettingsModal()">
             لغو

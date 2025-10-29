@@ -336,7 +336,7 @@ def settings():
         with open(config_path, "w") as f:
             yaml.safe_dump(config, f)
 
-        restart_backend()
+        # restart_backend()
         return jsonify({"status": "در حال اجرا با تنظیمات جدید"})
 
     # GET
