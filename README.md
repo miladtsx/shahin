@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS metadata (
 CREATE TABLE IF NOT EXISTS traffic (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     plate_uuid TEXT NOT NULL,
-    location TEXT,
+    camera_location TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (plate_uuid) REFERENCES plates(uuid)
 );
