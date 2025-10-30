@@ -235,136 +235,262 @@
       <div class="modal-content">
         <span class="modal-close" onclick="closeSettingsModal()">&times;</span>
         <h3>تنظیمات</h3>
+        <p class="settings-subtitle">
+          بخش‌های زیر را مرور کنید و تنها چند کلیک ساده برای تنظیم تجربه‌ی مخصوص
+          به شما کافی است.
+        </p>
         <div class="settings-container">
-          <div class="video-preview-wrapper">
-            <img id="videoFeed" src="" alt="Video Preview" />
-            <div class="preview-actions">
-              <button class="button" id="hotZoneBtn">منطقه تشخیص</button>
-              <button
-                class="button secondary-btn"
-                id="rotationBtn"
-                onclick="Rotation.open()"
+          <input
+            type="radio"
+            name="settings-tab"
+            id="settings-tab-camera"
+            class="settings-tab-radio"
+            checked
+          />
+          <input
+            type="radio"
+            name="settings-tab"
+            id="settings-tab-detection"
+            class="settings-tab-radio"
+          />
+          <input
+            type="radio"
+            name="settings-tab"
+            id="settings-tab-restrictions"
+            class="settings-tab-radio"
+          />
+
+          <aside class="settings-nav">
+            <label class="settings-nav-item" for="settings-tab-camera">
+              <span class="nav-title">دوربین</span>
+              <span class="nav-caption">پیش‌نمایش و مسیر</span>
+            </label>
+            <label class="settings-nav-item" for="settings-tab-detection">
+              <span class="nav-title">تشخیص</span>
+              <span class="nav-caption">آستانه‌ها و سرعت</span>
+            </label>
+            <label class="settings-nav-item" for="settings-tab-restrictions">
+              <span class="nav-title">محدودیت‌ها</span>
+              <span class="nav-caption">ساعات مدیریت شده</span>
+            </label>
+          </aside>
+
+          <div class="settings-main">
+            <div class="settings-panels">
+              <section class="settings-panel" data-tab="settings-tab-camera">
+                <div class="panel-header">
+                  <h4>پیکربندی دوربین</h4>
+                  <p>
+                    مسیر دوربین و برچسب‌گذاری موقعیت را تنظیم کنید تا پیش‌نمایش
+                    بالا همیشه آماده باشد.
+                  </p>
+                </div>
+                <div class="panel-body">
+                  <div class="field">
+                    <label
+                      for="video_path"
+                      title="مسیر فایل ویدیویی یا آدرس استریم دوربین."
+                      >آدرس دوربین</label
+                    >
+                    <input
+                      type="text"
+                      dir="ltr"
+                      id="video_path"
+                      name="video_path"
+                      oninput="updateVideoStream()"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="camera_location" title="موقعیت دوربین"
+                      >موقعیت دوربین</label
+                    >
+                    <input
+                      type="text"
+                      dir="ltr"
+                      id="camera_location"
+                      name="camera_location"
+                      oninput="updateVideoStream()"
+                    />
+                  </div>
+                  <div class="field note">
+                    <span class="field-hint"
+                      >پیش‌نمایش بالای صفحه بلافاصله تغییرات مسیر را بازتاب
+                      می‌دهد.</span
+                    >
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-panel" data-tab="settings-tab-detection">
+                <div class="panel-header">
+                  <h4>تنظیمات هوشمند تشخیص</h4>
+                  <p>
+                    با جابه‌جایی نرم اسلایدر‌ها تعادل بین دقت و سرعت سیستم را
+                    پیدا کنید.
+                  </p>
+                </div>
+                <div class="panel-body">
+                  <div class="field">
+                    <label
+                      for="frame_skip"
+                      title="تعداد فریم‌هایی که بین هر پردازش رد می‌شوند."
+                      >تعداد فریم‌های قابل رد کردن</label
+                    >
+                    <div class="slider-container">
+                      <input
+                        type="range"
+                        min="1"
+                        max="120"
+                        step="1"
+                        value="1"
+                        id="frame_skip"
+                        name="frame_skip"
+                        oninput="this.nextElementSibling.value = this.value"
+                      />
+                      <output>1</output>
+                    </div>
+                  </div>
+                  <div class="advanced-settings" data-advanced-settings>
+                    <button
+                      type="button"
+                      class="advanced-settings-toggle"
+                      data-role="advanced-settings-toggle"
+                      aria-expanded="false"
+                      aria-controls="advancedSettingsContent"
+                    >
+                      تنظیمات پیشرفته
+                      <span class="toggle-icon" aria-hidden="true"></span>
+                    </button>
+                    <div
+                      id="advancedSettingsContent"
+                      class="advanced-settings-content"
+                      hidden
+                    >
+                      <div class="field">
+                        <label
+                          for="car_detection_threshold"
+                          title="حداقل اطمینان برای تشخیص خودرو (بین ۰ تا ۱)."
+                          >حساسیت تشخیص خودرو</label
+                        >
+                        <div class="slider-container">
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value="0.5"
+                            id="car_detection_threshold"
+                            name="car_detection_threshold"
+                            oninput="this.nextElementSibling.value = this.value"
+                          />
+                          <output>0.5</output>
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label
+                          for="plate_detection_threshold"
+                          title="حداقل اطمینان برای تشخیص پلاک (بین ۰ تا ۱)."
+                          >حساسیت تشخیص پلاک</label
+                        >
+                        <div class="slider-container">
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value="0.5"
+                            id="plate_detection_threshold"
+                            name="plate_detection_threshold"
+                            oninput="this.nextElementSibling.value = this.value"
+                          />
+                          <output>0.5</output>
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label
+                          for="crop_dimension_threshold"
+                          title="حداقل ابعاد (عرض یا ارتفاع) برای برش پلاک."
+                          >آستانه ابعاد برش پلاک</label
+                        >
+                        <select
+                          id="crop_dimension_threshold"
+                          name="crop_dimension_threshold"
+                        >
+                          <option value="2500">بالا (2500)</option>
+                          <option value="2000" selected>متوسط (2000)</option>
+                          <option value="1000">پایین (1000)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section
+                class="settings-panel"
+                data-tab="settings-tab-restrictions"
               >
-                چرخش تصویر
-              </button>
+                <div class="panel-header">
+                  <h4>مدیریت بازه‌های کنترل</h4>
+                  <p>
+                    ساعات حساس ممنوعه را مشخص کنید تا رهگیری‌ها به صورت بصری
+                    برجسته شوند.
+                  </p>
+                </div>
+                <div class="panel-body">
+                  <div class="field">
+                    <label
+                      for="restricted_hours_start"
+                      title="ترددهایی که در این بازه رخ می‌دهند به عنوان ساعات ممنوعه در داشبورد نمایش داده می‌شوند."
+                      >بازه ساعات ممنوعه</label
+                    >
+                    <div class="time-range-inputs">
+                      <input
+                        type="time"
+                        id="restricted_hours_start"
+                        name="restricted_hours_start"
+                      />
+                      <span class="time-separator">تا</span>
+                      <input
+                        type="time"
+                        id="restricted_hours_end"
+                        name="restricted_hours_end"
+                      />
+                    </div>
+                  </div>
+                  <div class="field note">
+                    <span class="field-hint"
+                      >ترددهای داخل این بازه در داشبورد با هشدار مشخص
+                      می‌شوند.</span
+                    >
+                  </div>
+                </div>
+              </section>
             </div>
-            <!-- <p>وضعیت سرویس: <span id="backendStatus">نامشخص</span></p> -->
-          </div>
-          <div class="settings-form-wrapper">
-            <div class="settings-form">
-              <label
-                for="video_path"
-                title="مسیر فایل ویدیویی یا آدرس استریم دوربین."
-                >آدرس دوربین:</label
-              >
-              <input
-                type="text"
-                dir="ltr"
-                id="video_path"
-                name="video_path"
-                oninput="updateVideoStream()"
-              />
-              <label for="camera_location" title="موقعیت دوربین"
-                >موقعیت دوربین:</label
-              >
-              <input
-                type="text"
-                dir="ltr"
-                id="camera_location"
-                name="camera_location"
-                oninput="updateVideoStream()"
-              />
 
-              <label
-                for="frame_skip"
-                title="تعداد فریم‌هایی که بین هر پردازش رد می‌شوند."
-                >تعداد فریم‌های قابل رد کردن:</label
-              >
-              <div class="slider-container">
-                <input
-                  type="range"
-                  min="1"
-                  max="120"
-                  step="1"
-                  value="1"
-                  id="frame_skip"
-                  name="frame_skip"
-                  oninput="this.nextElementSibling.value = this.value"
-                />
-                <output>1</output>
-              </div>
-
-              <label
-                for="car_detection_threshold"
-                title="حداقل اطمینان برای تشخیص خودرو (بین ۰ تا ۱)."
-                >حساسیت تشخیص خودرو:</label
-              >
-              <div class="slider-container">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value="0.5"
-                  id="car_detection_threshold"
-                  name="car_detection_threshold"
-                  oninput="this.nextElementSibling.value = this.value"
-                />
-                <output>0.5</output>
-              </div>
-
-              <label
-                for="plate_detection_threshold"
-                title="حداقل اطمینان برای تشخیص پلاک (بین ۰ تا ۱)."
-                >حساسیت تشخیص پلاک:</label
-              >
-              <div class="slider-container">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value="0.5"
-                  id="plate_detection_threshold"
-                  name="plate_detection_threshold"
-                  oninput="this.nextElementSibling.value = this.value"
-                />
-                <output>0.5</output>
-              </div>
-
-              <label
-                for="crop_dimension_threshold"
-                title="حداقل ابعاد (عرض یا ارتفاع) برای برش پلاک."
-                >آستانه ابعاد برش پلاک:</label
-              >
-              <div class="slider-container">
-                <select
-                  id="crop_dimension_threshold"
-                  name="crop_dimension_threshold"
-                >
-                  <option value="2500">بالا (2500)</option>
-                  <option value="2000" selected>متوسط (2000)</option>
-                  <option value="1000">پایین (1000)</option>
-                </select>
-              </div>
-
-              <label
-                for="restricted_hours_start"
-                title="ترددهایی که در این بازه رخ می‌دهند به عنوان ساعات ممنوعه در داشبورد نمایش داده می‌شوند."
-                >شروع ساعات ممنوعه:</label
-              >
-              <div class="time-range-inputs">
-                <input type="time" id="restricted_hours_start" name="restricted_hours_start" />
-                <span class="time-separator">تا</span>
-                <input type="time" id="restricted_hours_end" name="restricted_hours_end" />
+            <div class="settings-preview">
+              <div class="video-preview-wrapper">
+                <div class="preview-header">
+                  <span class="preview-label">پخش زنده دوربین</span>
+                  <span class="preview-status" id="previewStatus">آماده</span>
+                </div>
+                <img id="videoFeed" src="" alt="Video Preview" />
+                <div class="preview-actions">
+                  <button class="button" id="hotZoneBtn">منطقه تشخیص</button>
+                  <button
+                    class="button secondary-btn"
+                    id="rotationBtn"
+                    onclick="Rotation.open()"
+                  >
+                    چرخش تصویر
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
         <div class="modal-actions">
-          <button class="button red-btn" onclick="saveSettings()">
-            ثبت
-          </button>
+          <button class="button red-btn" onclick="saveSettings()">ثبت</button>
           <button class="button green-btn" onclick="closeSettingsModal()">
             لغو
           </button>

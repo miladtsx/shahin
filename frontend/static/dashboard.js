@@ -5,6 +5,7 @@ let CURRENT_FILTERS = {}; // keep filters for export and paging
 const RESTRICTED_STORAGE_KEY = "restrictedHours";
 let RESTRICTED_HOURS = { start: "", end: "" };
 let RESTRICTED_FILTER_ACTIVE = false;
+let advancedSettingsInitialized = false;
 
 // CRUD
 async function fetchTraffic(query = "") {
@@ -572,6 +573,7 @@ function exportCSV() {
 // initial load
 window.onload = async () => {
   document.getElementById("perPageSelect").value = String(CURRENT_PER_PAGE);
+  setupAdvancedSettingsToggle();
   await initializeRestrictedHours();
   fetchTraffic();
 };
@@ -584,10 +586,44 @@ document
     }
   });
 
+function setupAdvancedSettingsToggle() {
+  if (advancedSettingsInitialized) return;
+  const container = document.querySelector("[data-advanced-settings]");
+  if (!container) return;
+
+  const toggleButton = container.querySelector(
+    "[data-role='advanced-settings-toggle']"
+  );
+  const content = container.querySelector(".advanced-settings-content");
+  if (!toggleButton || !content) return;
+
+  toggleButton.addEventListener("click", () => {
+    const expanded = toggleButton.getAttribute("aria-expanded") === "true";
+    toggleButton.setAttribute("aria-expanded", expanded ? "false" : "true");
+    content.hidden = expanded;
+    content.classList.toggle("open", !expanded);
+  });
+
+  advancedSettingsInitialized = true;
+}
+
+function resetAdvancedSettingsSection() {
+  const toggleButton = document.querySelector(
+    "[data-role='advanced-settings-toggle']"
+  );
+  const content = document.getElementById("advancedSettingsContent");
+  if (!toggleButton || !content) return;
+
+  toggleButton.setAttribute("aria-expanded", "false");
+  content.hidden = true;
+  content.classList.remove("open");
+}
+
 // #region Settings Modal
 function openSettingsModal() {
   document.getElementById("settingsModal").style.display = "flex";
   loadSettings();
+  resetAdvancedSettingsSection();
 
   const hotZoneBtn = document.getElementById("hotZoneBtn");
   if (hotZoneBtn && !hotZoneBtn.dataset.listenerAttached) {
