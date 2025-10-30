@@ -248,13 +248,13 @@ def delete_plate(plate_uuid):
 
 
 # export CSV
-@app.route("/plates/export", methods=["GET"])
-def export_plates_csv():
+@app.route("/traffic/export", methods=["GET"])
+def export_traffic_csv():
     plate_text = request.args.get("plate_text", "").strip()
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
 
-    query = "SELECT id, vehicle_id, plate_text, timestamp FROM plates WHERE 1=1"
+    query = "SELECT plate_uuid, camera_location, timestamp FROM traffic WHERE 1=1"
     params = []
     if plate_text:
         query += " AND plate_text LIKE ?"

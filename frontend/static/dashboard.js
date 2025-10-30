@@ -410,7 +410,7 @@ function exportCSV() {
     end_ts: CURRENT_FILTERS.end_ts || "",
   }).toString();
 
-  window.open(`/plates/export?${params}`, "_blank");
+  window.open(`/traffic/export?${params}`, "_blank");
 }
 
 // initial load
