@@ -1,7 +1,15 @@
-[] refetch list of plates in dashboard every second!
-[] remove redundant plates
-[] https://chatgpt.com/c/68b5af97-d6e8-832d-a353-30fa4d06d500
+[] the system is designed for 1 camera only in the MVP. it must be extended if the client wants it.
+[] Filter to show only 'DETECTION_FAILED' plates
+[] the detailed view should have the highest quality of the image
+[] windows service to make sure app is always on
+[] try to detect when plate is not detected or add a confidence score
+[] record a video of a car with low confidence score
+[] video is dead, let the operator know.
+[] auto start application, do not ask operator to start backend or dashboard.
+[] common errors reading video streams and make the app resilient.
 [] cpu vs gpu, how to tell the difference?
+[+] define restricted hours
+[+] remove redundant plates
 [+] save the whole image of sampling plate
 [+] car info [type, color] when plate is unknown
 [+] add metadata for a plate.
@@ -12,12 +20,6 @@
 [+] instead of the most sharp plate, get the most confident one!
 [+] admin dashboard enable sensitive area selection.
 [+] out directory should be unique per each car so they dont overwrite old data
-[] windows service to make sure app is always on
-[] try to detect when plate is not detected or add a confidence score
-[] record a video of a car with low confidence score
-[] video is dead, let the operator know.
-[] auto start application, do not ask operator to start backend or dashboard.
-[] common errors reading video streams and make the app resilient.
-
-[] make settings user friendly
-[] sensitivity: a draggable bar or 3 options (low, medium, high)
+[+] make settings user friendly
+[+] sensitivity: a draggable bar or 3 options (low, medium, high)
+[+] Get a better picture of the moving car
