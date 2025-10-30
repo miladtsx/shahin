@@ -75,9 +75,33 @@ main {
 
 .card-header {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
   margin-bottom: 20px;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.restricted-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95em;
+  color: #c0392b;
+}
+
+.restricted-status .status-label {
+  color: #7f8c8d;
+}
+
+.restricted-status span#restrictedWindow {
+  font-weight: 600;
+  color: #2c3e50;
 }
 
 /* Button Styles */
@@ -144,6 +168,17 @@ main {
 .button.icon-button:hover {
   color: #0056b3;
   transform: scale(1.1);
+}
+
+.button.icon-button.alert-button {
+  font-size: 1.2em;
+  color: #e67e22;
+}
+
+.button.icon-button.alert-button.active {
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.1);
+  border-radius: 50%;
 }
 
 .button.secondary-btn {
@@ -840,6 +875,32 @@ td img:hover {
   color: #333;
   min-width: 30px;
   text-align: center;
+}
+
+.time-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.time-range-inputs input[type="time"] {
+  width: 120px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-family: "Vazirmatn-Regular", sans-serif;
+}
+
+.time-range-inputs .time-separator {
+  font-weight: 600;
+  color: #7f8c8d;
+}
+
+.settings-form .field-hint {
+  grid-column: 1 / -1;
+  margin: -4px 0 10px;
+  font-size: 0.85em;
+  color: #7f8c8d;
 }
 
 /* Hot Zone Modal */

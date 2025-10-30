@@ -32,19 +32,33 @@
         <div class="card">
           <!-- Card Header -->
           <div class="card-header">
-            <button class="button new-plate" onclick="openAddPlateModal()">
-              افزودن
-            </button>
-            <button class="button toggle-filter" onclick="toggleFilterBar()">
-              فیلتر
-            </button>
-            <button
-              class="button icon-button"
-              title="استخراج CSV"
-              onclick="exportCSV()"
-            >
-              ⬇️
-            </button>
+            <div class="card-actions">
+              <button class="button new-plate" onclick="openAddPlateModal()">
+                افزودن
+              </button>
+              <button class="button toggle-filter" onclick="toggleFilterBar()">
+                فیلتر
+              </button>
+              <button
+                class="button icon-button"
+                title="استخراج CSV"
+                onclick="exportCSV()"
+              >
+                ⬇️
+              </button>
+              <button
+                id="restrictedFilterBtn"
+                class="button icon-button alert-button"
+                title="نمایش ترددهای ساعات ممنوعه"
+                onclick="toggleRestrictedFilter()"
+              >
+                ⚠️
+              </button>
+            </div>
+            <div class="restricted-status" id="restrictedStatus">
+              <span class="status-label">ساعات ممنوعه:</span>
+              <span id="restrictedWindow">—</span>
+            </div>
           </div>
 
           <!-- Filter Bar -->
@@ -332,6 +346,17 @@
                   <option value="2000" selected>متوسط (2000)</option>
                   <option value="1000">پایین (1000)</option>
                 </select>
+              </div>
+
+              <label
+                for="restricted_hours_start"
+                title="ترددهایی که در این بازه رخ می‌دهند به عنوان ساعات ممنوعه در داشبورد نمایش داده می‌شوند."
+                >شروع ساعات ممنوعه:</label
+              >
+              <div class="time-range-inputs">
+                <input type="time" id="restricted_hours_start" name="restricted_hours_start" />
+                <span class="time-separator">تا</span>
+                <input type="time" id="restricted_hours_end" name="restricted_hours_end" />
               </div>
             </div>
           </div>

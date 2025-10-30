@@ -1,9 +1,10 @@
-window.onload = fetchTraffic;
-
 let CURRENT_PAGE = 1;
 let CURRENT_PER_PAGE = 5;
 let TOTAL_PAGES = 0;
 let CURRENT_FILTERS = {}; // keep filters for export and paging
+const RESTRICTED_STORAGE_KEY = "restrictedHours";
+let RESTRICTED_HOURS = { start: "", end: "" };
+let RESTRICTED_FILTER_ACTIVE = false;
 
 // CRUD
 async function fetchTraffic(query = "") {
@@ -15,6 +16,8 @@ async function fetchTraffic(query = "") {
         plate_text: CURRENT_FILTERS.plate_text || "",
         start_ts: CURRENT_FILTERS.start_ts || "",
         end_ts: CURRENT_FILTERS.end_ts || "",
+        restricted_start: CURRENT_FILTERS.restricted_start || "",
+        restricted_end: CURRENT_FILTERS.restricted_end || "",
       }).toString();
 
   const res = await fetch(`/traffic?${qs}`);
@@ -380,14 +383,25 @@ function applyFilters() {
   if (plate) {
     CURRENT_FILTERS.plate_text = toFarsiNumber(plate);
     params.append("plate_text", toFarsiNumber(plate));
+  } else {
+    delete CURRENT_FILTERS.plate_text;
   }
   if (start) {
     CURRENT_FILTERS.start_ts = start;
     params.append("start_ts", start);
+  } else {
+    delete CURRENT_FILTERS.start_ts;
   }
   if (end) {
     CURRENT_FILTERS.end_ts = end;
     params.append("end_ts", end);
+  } else {
+    delete CURRENT_FILTERS.end_ts;
+  }
+
+  if (RESTRICTED_FILTER_ACTIVE) {
+    params.append("restricted_start", CURRENT_FILTERS.restricted_start);
+    params.append("restricted_end", CURRENT_FILTERS.restricted_end);
   }
 
   fetchTraffic(params.toString());
@@ -398,8 +412,148 @@ function clearFilters() {
   document.getElementById("filterStart").value = "";
   document.getElementById("filterEnd").value = "";
   CURRENT_FILTERS = {};
+  setRestrictedFilterState(false);
   toggleFilterBar();
   fetchTraffic();
+}
+
+function syncRestrictedHours(start, end, options = {}) {
+  const { updateInputs = true, persist = true, triggerFetch = false } = options;
+
+  const normalizedStart = start || "";
+  const normalizedEnd = end || "";
+  const hasValidRange =
+    normalizedStart && normalizedEnd && normalizedStart !== normalizedEnd;
+
+  if (hasValidRange) {
+    RESTRICTED_HOURS = {
+      start: normalizedStart,
+      end: normalizedEnd,
+    };
+    if (persist) {
+      localStorage.setItem(
+        RESTRICTED_STORAGE_KEY,
+        JSON.stringify(RESTRICTED_HOURS)
+      );
+    }
+  } else {
+    RESTRICTED_HOURS = { start: "", end: "" };
+    if (persist) {
+      localStorage.removeItem(RESTRICTED_STORAGE_KEY);
+    }
+  }
+
+  if (updateInputs) {
+    const startInput = document.getElementById("restricted_hours_start");
+    const endInput = document.getElementById("restricted_hours_end");
+    if (startInput) startInput.value = RESTRICTED_HOURS.start || "";
+    if (endInput) endInput.value = RESTRICTED_HOURS.end || "";
+  }
+
+  updateRestrictedStatusDisplay();
+
+  if (RESTRICTED_FILTER_ACTIVE && !hasValidRange) {
+    setRestrictedFilterState(false);
+    if (triggerFetch) fetchTraffic();
+  } else if (RESTRICTED_FILTER_ACTIVE && hasValidRange) {
+    setRestrictedFilterState(true);
+    if (triggerFetch) fetchTraffic();
+  }
+}
+
+async function initializeRestrictedHours() {
+  let storedStart = "";
+  let storedEnd = "";
+
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem(RESTRICTED_STORAGE_KEY) || "{}"
+    );
+    if (stored.start && stored.end && stored.start !== stored.end) {
+      storedStart = stored.start;
+      storedEnd = stored.end;
+    }
+  } catch (error) {
+    console.warn("Failed to load restricted hours from local storage:", error);
+  }
+
+  let start = storedStart;
+  let end = storedEnd;
+
+  try {
+    const response = await fetch("/settings");
+    if (response.ok) {
+      const settingsData = await response.json();
+      const serverStart = settingsData.restricted_hours_start;
+      const serverEnd = settingsData.restricted_hours_end;
+      if (serverStart && serverEnd && serverStart !== serverEnd) {
+        start = serverStart;
+        end = serverEnd;
+      } else if (!serverStart || !serverEnd) {
+        start = "";
+        end = "";
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to load restricted hours from settings:", error);
+  }
+
+  syncRestrictedHours(start, end, { triggerFetch: false });
+  setRestrictedFilterState(false);
+}
+
+function updateRestrictedStatusDisplay() {
+  const windowLabel = document.getElementById("restrictedWindow");
+  if (!windowLabel) return;
+
+  if (RESTRICTED_HOURS.start && RESTRICTED_HOURS.end) {
+    windowLabel.textContent = `${toFarsiNumber(
+      RESTRICTED_HOURS.start
+    )} تا ${toFarsiNumber(RESTRICTED_HOURS.end)}`;
+  } else {
+    windowLabel.textContent = "—";
+  }
+}
+
+function setRestrictedFilterState(isActive) {
+  const canActivate = Boolean(
+    RESTRICTED_HOURS.start && RESTRICTED_HOURS.end
+  );
+  const nextState = Boolean(isActive) && canActivate;
+  RESTRICTED_FILTER_ACTIVE = nextState;
+
+  const button = document.getElementById("restrictedFilterBtn");
+  if (button) {
+    button.classList.toggle("active", RESTRICTED_FILTER_ACTIVE);
+    button.setAttribute(
+      "aria-pressed",
+      RESTRICTED_FILTER_ACTIVE ? "true" : "false"
+    );
+  }
+
+  if (RESTRICTED_FILTER_ACTIVE) {
+    CURRENT_FILTERS.restricted_start = RESTRICTED_HOURS.start;
+    CURRENT_FILTERS.restricted_end = RESTRICTED_HOURS.end;
+  } else {
+    delete CURRENT_FILTERS.restricted_start;
+    delete CURRENT_FILTERS.restricted_end;
+  }
+}
+
+function toggleRestrictedFilter() {
+  if (!RESTRICTED_HOURS.start || !RESTRICTED_HOURS.end) {
+    showToast("ابتدا ساعات ممنوعه را در تنظیمات ذخیره کنید");
+    return;
+  }
+
+  const newState = !RESTRICTED_FILTER_ACTIVE;
+  setRestrictedFilterState(newState);
+  fetchTraffic();
+  showToast(
+    newState
+      ? "نمایش ترددهای ساعات ممنوعه فعال شد"
+      : "نمایش ترددهای ساعات ممنوعه غیرفعال شد"
+  );
 }
 
 // export CSV using current filters
@@ -408,14 +562,17 @@ function exportCSV() {
     plate_text: CURRENT_FILTERS.plate_text || "",
     start_ts: CURRENT_FILTERS.start_ts || "",
     end_ts: CURRENT_FILTERS.end_ts || "",
+    restricted_start: CURRENT_FILTERS.restricted_start || "",
+    restricted_end: CURRENT_FILTERS.restricted_end || "",
   }).toString();
 
   window.open(`/traffic/export?${params}`, "_blank");
 }
 
 // initial load
-window.onload = () => {
+window.onload = async () => {
   document.getElementById("perPageSelect").value = String(CURRENT_PER_PAGE);
+  await initializeRestrictedHours();
   fetchTraffic();
 };
 
@@ -474,6 +631,11 @@ async function loadSettings() {
     }
     updateVideoStream();
     applyRotation(config.rotation_angle || 0);
+    syncRestrictedHours(
+      config.restricted_hours_start,
+      config.restricted_hours_end,
+      { triggerFetch: false }
+    );
     checkBackendStatus();
   } catch (error) {
     console.error("Error loading settings:", error);
@@ -481,10 +643,28 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  const restrictedStartInput = document.getElementById(
+    "restricted_hours_start"
+  );
+  const restrictedEndInput = document.getElementById("restricted_hours_end");
+
+  const restrictedStart = restrictedStartInput?.value || "";
+  const restrictedEnd = restrictedEndInput?.value || "";
+
+  if ((restrictedStart && !restrictedEnd) || (!restrictedStart && restrictedEnd)) {
+    showToast("برای فعالسازی، هر دو ساعت را وارد کنید");
+    return;
+  }
+
+  if (restrictedStart && restrictedEnd && restrictedStart === restrictedEnd) {
+    showToast("ساعت شروع و پایان نمی‌تواند یکسان باشد");
+    return;
+  }
+
   const newConfig = {
     video_path: document.getElementById("video_path").value,
     camera_location: document.getElementById("camera_location").value,
-    frame_skip: parseInt(document.getElementById("frame_skip").value),
+    frame_skip: parseInt(document.getElementById("frame_skip").value, 10),
     car_detection_threshold: parseFloat(
       document.getElementById("car_detection_threshold").value
     ),
@@ -492,8 +672,11 @@ async function saveSettings() {
       document.getElementById("plate_detection_threshold").value
     ),
     crop_dimension_threshold: parseInt(
-      document.getElementById("crop_dimension_threshold").value
+      document.getElementById("crop_dimension_threshold").value,
+      10
     ),
+    restricted_hours_start: restrictedStart,
+    restricted_hours_end: restrictedEnd,
   };
 
   showLoading("در حال ذخیره تنظیمات...");
@@ -505,8 +688,13 @@ async function saveSettings() {
     });
 
     config = { ...config, ...newConfig };
-    applyRotation(newConfig.rotation_angle);
-debugger
+    syncRestrictedHours(
+      newConfig.restricted_hours_start,
+      newConfig.restricted_hours_end,
+      { triggerFetch: true }
+    );
+    updateVideoStream();
+    showToast("تنظیمات ذخیره شد");
     closeSettingsModal();
   } catch (error) {
     console.error("Error saving settings:", error);

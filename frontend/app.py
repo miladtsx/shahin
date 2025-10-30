@@ -8,6 +8,7 @@ import subprocess
 import signal
 import time
 import cv2
+from datetime import datetime
 from flask import (
     Flask,
     request,
@@ -78,6 +79,26 @@ def list_plates():
     plate_text = request.args.get("plate_text", "").strip()
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
+    restricted_start = request.args.get("restricted_start")
+    restricted_end = request.args.get("restricted_end")
+
+    restricted_clause = ""
+    restricted_params = []
+    if restricted_start and restricted_end:
+        try:
+            datetime.strptime(restricted_start, "%H:%M")
+            datetime.strptime(restricted_end, "%H:%M")
+            time_expr = "strftime('%H:%M', t.timestamp)"
+            if restricted_start <= restricted_end:
+                restricted_clause = f" AND {time_expr} BETWEEN ? AND ?"
+                restricted_params = [restricted_start, restricted_end]
+            else:
+                restricted_clause = f" AND ({time_expr} >= ? OR {time_expr} <= ?)"
+                restricted_params = [restricted_start, restricted_end]
+        except ValueError:
+            restricted_start = restricted_end = None
+            restricted_clause = ""
+            restricted_params = []
 
     query = """
     SELECT p.uuid, p.plate_text, t.timestamp, t.camera_location,
@@ -97,6 +118,9 @@ def list_plates():
     if end_ts:
         query += " AND t.timestamp <= ?"
         params.append(end_ts)
+    if restricted_clause:
+        query += restricted_clause
+        params.extend(restricted_params)
 
     query += " ORDER BY t.timestamp DESC LIMIT ? OFFSET ?"
     params.extend([per_page, offset])
@@ -123,6 +147,9 @@ def list_plates():
         if end_ts:
             count_q += " AND t.timestamp <= ?"
             count_params.append(end_ts)
+        if restricted_clause:
+            count_q += restricted_clause
+            count_params.extend(restricted_params)
         cur.execute(count_q, count_params)
         total = cur.fetchone()[0]
 
@@ -253,6 +280,8 @@ def export_traffic_csv():
     plate_text = request.args.get("plate_text", "").strip()
     start_ts = request.args.get("start_ts")
     end_ts = request.args.get("end_ts")
+    restricted_start = request.args.get("restricted_start")
+    restricted_end = request.args.get("restricted_end")
 
     query = "SELECT plate_uuid, camera_location, timestamp FROM traffic WHERE 1=1"
     params = []
@@ -265,6 +294,19 @@ def export_traffic_csv():
     if end_ts:
         query += " AND timestamp <= ?"
         params.append(end_ts)
+    if restricted_start and restricted_end:
+        try:
+            datetime.strptime(restricted_start, "%H:%M")
+            datetime.strptime(restricted_end, "%H:%M")
+            time_expr = "strftime('%H:%M', timestamp)"
+            if restricted_start <= restricted_end:
+                query += f" AND {time_expr} BETWEEN ? AND ?"
+                params.extend([restricted_start, restricted_end])
+            else:
+                query += f" AND ({time_expr} >= ? OR {time_expr} <= ?)"
+                params.extend([restricted_start, restricted_end])
+        except ValueError:
+            pass
     query += " ORDER BY timestamp DESC"
 
     with get_conn() as conn:
