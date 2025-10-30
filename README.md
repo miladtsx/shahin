@@ -100,6 +100,44 @@ CREATE TABLE IF NOT EXISTS traffic (
 
 ```
 
+  ## High-Level Goal
+
+  The main purpose of OnlineBestFrameSelector is to efficiently select the highest quality license plate image for each
+  tracked vehicle without performing expensive processing (like OCR) on every single frame. It only runs the full OCR
+  pipeline once per vehicle, after the vehicle has left the scene.
+
+  ## How It Works: Step-by-Step
+
+   1. Collecting Candidates (The `update` method)
+       * Contrary to what the variable name most_confident_plate_crop might suggest, the class doesn't just store a single
+         best frame. Instead, for each vehicle ID (vid), it maintains a list of the top 300 best plate candidates detected
+         so far.
+       * This list is stored in the dictionary self.most_confident_plate_crop.
+       * When the update method is called with a new plate detection, it adds the new plate's confidence score, the plate
+         crop image, and the full frame to a list associated with that vehicle's ID.
+       * To keep the list from growing indefinitely, it's capped at 300 entries, always keeping the ones with the highest
+         confidence scores.
+
+   2. Deciding When to Finalize (The `to_finalize` method)
+       * The selector keeps track of when each vehicle was last seen.
+       * If a vehicle ID is no longer present in the current frame's active detections, a counter (missed_frames) starts.
+       * If a vehicle remains unseen for a certain number of frames (defined by track_timeout), this method identifies its
+         ID as ready "to be finalized." This assumes the vehicle has left the camera's view.
+
+   3. Processing the Best Candidate (The `finalize` method)
+       * Once a vehicle is marked for finalization, this method is called.
+       * It retrieves the list of top 300 candidates for that vehicle from self.most_confident_plate_crop.
+       * It then selects the single best candidate from this list by finding the one with the maximum confidence_score.
+       * Only this single, best plate crop is then sent through the full, expensive OCR pipeline:
+           1. Pre-processing: The image is cleaned up.
+           2. Segmentation: The characters on the plate are isolated.
+           3. Classification: Each character (glyph) is identified.
+       * Finally, the resulting plate text is saved to the database, and the original frame and plate crop are saved to
+         disk for auditing.
+
+---
 
 ## Document
 [link](https://docs.google.com/document/d/1_Q-legmeUw9Q5sP0G9K7ayoIYyhgSnebhKUnHNxscoQ/edit?tab=t.0#heading=h.z6ne0og04bp5)
+
+
