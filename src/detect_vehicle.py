@@ -44,6 +44,13 @@ def run_plate_detection():
 
     logger.info("Starting continuous plate detection service...")
 
+    frame_skip = max(conf.get("frame_skip", 1), 1)  # always ≥1
+    rotation_angle = float(conf.get("rotation_angle", 0) or 0)
+    hot_zone_def = conf.get("hot_zone")
+    hot_zone_mask = None
+    hot_zone_pts = []
+    cached_mask_shape = None
+
     try:
         # Continuous Monitoring
         while True:
@@ -56,9 +63,6 @@ def run_plate_detection():
                 )
 
                 frame_index = 0
-
-                frame_skip = max(conf.get("frame_skip", 1), 1)  # always ≥1
-                rotation_angle = float(conf.get("rotation_angle", 0) or 0)
 
                 logger.info("Starting video processing...")
                 # region Processing
@@ -81,25 +85,23 @@ def run_plate_detection():
                         # endregion
 
                         # region Hotzone
-                        hot_zone = conf.get("hot_zone")
-                        if hot_zone:
+                        if hot_zone_def:
                             h, w = frame.shape[:2]
-                            # Convert normalized points to pixel coordinates
-                            hot_zone_pts = [
-                                (int(p["x"] * w), int(p["y"] * h)) for p in hot_zone
-                            ]
+                            if cached_mask_shape != (h, w):
+                                hot_zone_pts = [
+                                    (int(p["x"] * w), int(p["y"] * h))
+                                    for p in hot_zone_def
+                                ]
+                                hot_zone_mask = np.zeros((h, w), dtype=np.uint8)
+                                cv2.fillPoly(
+                                    hot_zone_mask,
+                                    [np.array(hot_zone_pts, dtype=np.int32)],
+                                    255,
+                                )
+                                cached_mask_shape = (h, w)
 
-                            # Create a mask for the polygon
-                            mask = np.zeros((h, w), dtype=np.uint8)
-                            cv2.fillPoly(
-                                mask, [np.array(hot_zone_pts, dtype=np.int32)], 255
-                            )
-
-                            # Apply mask to frame
-                            roi = cv2.bitwise_and(frame, frame, mask=mask)
-
+                            roi = cv2.bitwise_and(frame, frame, mask=hot_zone_mask)
                         else:
-                            hot_zone_pts = []
                             roi = frame
 
                         # endregion
