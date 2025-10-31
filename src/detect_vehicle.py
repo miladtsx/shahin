@@ -1,5 +1,6 @@
 import cv2
 import time
+from typing import Optional
 from src.db.sqlite import DB
 from src.detectors.vehicle_detector import VehicleDetector
 from src.detectors.plate_detector import PlateDetector
@@ -48,8 +49,10 @@ def run_plate_detection():
     rotation_angle = float(conf.get("rotation_angle", 0) or 0)
     hot_zone_def = conf.get("hot_zone")
     hot_zone_mask = None
-    hot_zone_pts = []
     cached_mask_shape = None
+    car_detection_threshold = conf.get("car_detection_threshold")
+    plate_detection_threshold = conf.get("plate_detection_threshold")
+    rotation_cache = {"shape": None, "matrix": None}
 
     try:
         # Continuous Monitoring
@@ -73,7 +76,7 @@ def run_plate_detection():
                             continue
 
                         if rotation_angle:
-                            frame = rotate_frame(frame, rotation_angle)
+                            frame = rotate_frame(frame, rotation_angle, rotation_cache)
 
                         # region Validate
                         if not frame.any() or frame.mean() < 5:  # near black
@@ -88,14 +91,18 @@ def run_plate_detection():
                         if hot_zone_def:
                             h, w = frame.shape[:2]
                             if cached_mask_shape != (h, w):
-                                hot_zone_pts = [
-                                    (int(p["x"] * w), int(p["y"] * h))
-                                    for p in hot_zone_def
-                                ]
                                 hot_zone_mask = np.zeros((h, w), dtype=np.uint8)
                                 cv2.fillPoly(
                                     hot_zone_mask,
-                                    [np.array(hot_zone_pts, dtype=np.int32)],
+                                    [
+                                        np.array(
+                                            [
+                                                (int(p["x"] * w), int(p["y"] * h))
+                                                for p in hot_zone_def
+                                            ],
+                                            dtype=np.int32,
+                                        )
+                                    ],
                                     255,
                                 )
                                 cached_mask_shape = (h, w)
@@ -109,7 +116,7 @@ def run_plate_detection():
                         # region Detect
                         try:
                             vehicles = vehicle_detector.detect(
-                                roi, conf_threshold=conf["car_detection_threshold"]
+                                roi, conf_threshold=car_detection_threshold
                             )
                             if vehicles.size == 0:
                                 continue
@@ -142,6 +149,8 @@ def run_plate_detection():
                             set()
                         )  # TODO POST MVP remove and use the internal selector tracking
                         # show(draw_boxes(frame.copy(), tracked_vehicles), "Vehicle Tracked")
+                        vehicle_crops = []
+                        crop_meta = []
                         # endregion
 
                         # region Selection
@@ -149,53 +158,58 @@ def run_plate_detection():
                             vuuid = t["id"]
                             active_ids.add(vuuid)
                             selector.mark_seen(vuuid, frame_index, frame)
-                            x1, y1, x2, y2 = t["bbox"]
-                            vehicle_crops = []
-                            cvc = frame[y1:y2, x1:x2]
-                            if cvc.size > 0:
-                                vehicle_crops.append(cvc)
-                                # Batch plate detection
-                                plates_batch = detector_plate.detect_batch(
-                                    vehicle_crops,
-                                    conf_threshold=conf.get(
-                                        "plate_detection_threshold"
-                                    ),
-                                )
+                            vehicle_crop_bbox = t.get("bbox")
+                            if not vehicle_crop_bbox:
+                                continue
+                            x1, y1, x2, y2 = vehicle_crop_bbox
+                            vehicle_crop = frame[y1:y2, x1:x2]
+                            if vehicle_crop.size == 0:
+                                continue
+                            vehicle_crops.append(vehicle_crop)
+                            crop_meta.append(
+                                {
+                                    "id": vuuid,
+                                    "vehicle_bbox": vehicle_crop_bbox,
+                                    "vehicle_crop": vehicle_crop,
+                                }
+                            )
 
-                                # region Score plate(s)
-                                for plates, vh_crop in zip(plates_batch, vehicle_crops):
-                                    if not plates:
-                                        continue
+                        if vehicle_crops:
+                            plates_batch = detector_plate.detect_batch(
+                                vehicle_crops,
+                                conf_threshold=plate_detection_threshold,
+                            )
 
-                                    # Process all valid plates and let OnlineBestFrameSelector handle quality evaluation
-                                    for plate in plates:
-                                        try:
-                                            # clean cut the plate crop
-                                            px1, py1, px2, py2 = shrink_box(
-                                                *plate["bbox"]
-                                            )
+                            # region Score plate(s)
+                            for meta, plates in zip(crop_meta, plates_batch):
+                                if not plates:
+                                    continue
 
-                                            plate_crop = vh_crop[py1:py2, px1:px2]
-                                            if plate_crop.size == 0:
-                                                continue
-                                            # show(plate_crop, "Plate")
+                                for plate in plates:
+                                    try:
 
-                                            # Let OnlineBestFrameSelector handle quality evaluation
-                                            selector.update(
-                                                vuuid,
-                                                plate_crop,
-                                                frame_index,
-                                                full_frame=frame,
-                                                vehicle_crop=t.get("bbox"),
-                                            )
-                                        except Exception as e:
-                                            # if failed to process one plate, keep processing other plates.
-                                            # one failure should not bring the whole system down.
-                                            logger.error(
-                                                f"Error processing plate for vehicle {vuuid}: {e}"
-                                            )
+                                        plate_bbox = plate.get("bbox")
+                                        if not plate_bbox:
                                             continue
-                                # endregion
+                                        vehicle_crop = meta["vehicle_crop"]
+                                        px1, py1, px2, py2 = shrink_box(*plate_bbox)
+                                        plate_crop = vehicle_crop[py1:py2, px1:px2]
+                                        if plate_crop.size == 0:
+                                            continue
+
+                                        selector.update(
+                                            meta["id"],
+                                            plate_crop,
+                                            frame_index,
+                                            full_frame=frame,
+                                            vehicle_bbox=meta.get("vehicle_bbox"),
+                                        )
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Error processing plate for vehicle {meta.get('id')}: {e}"
+                                        )
+                                        continue
+                            # endregion
 
                         # endregion
 
@@ -205,7 +219,6 @@ def run_plate_detection():
                         )
                         if len(to_finalize):
                             for vuuid in to_finalize:
-                                # executor.submit(selector.finalize, db, vid)
                                 selector.finalize(vuuid)
                         # endregion
 
@@ -228,14 +241,22 @@ def run_plate_detection():
 
 
 # Shrink box by a fixed margin percentage
-def rotate_frame(frame: np.ndarray, angle: float) -> np.ndarray:
-    """Rotate frame around its center, keeping original dimensions."""
+def rotate_frame(
+    frame: np.ndarray, angle: float, cache: Optional[dict] = None
+) -> np.ndarray:
+    """Rotate frame around its center, keeping original dimensions. Cache the transform per frame size."""
     if not angle:
         return frame
+    if cache is None:
+        cache = {}
 
     (h, w) = frame.shape[:2]
-    center = (w / 2, h / 2)
-    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+    if cache.get("shape") != (h, w):
+        center = (w / 2, h / 2)
+        cache["matrix"] = cv2.getRotationMatrix2D(center, angle, 1.0)
+        cache["shape"] = (h, w)
+
+    rotation_matrix = cache["matrix"]
     rotated = cv2.warpAffine(
         frame,
         rotation_matrix,

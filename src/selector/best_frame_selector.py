@@ -64,7 +64,7 @@ class OnlineBestFrameSelector:
         crop,
         frame_idx,
         full_frame,
-        vehicle_crop,
+        vehicle_bbox,
     ):
         """
         Update the selector with a new candidate frame for a vehicle.
@@ -90,8 +90,8 @@ class OnlineBestFrameSelector:
         self.top_plates[vid] = nlargest(TOP_K, heap, key=lambda x: x[0])
 
         # --- Update fully visible vehicle candidates ---
-        if vehicle_crop is not None and self.is_fully_visible(
-            vehicle_crop, full_frame.shape
+        if vehicle_bbox is not None and self.is_fully_visible(
+            vehicle_bbox, full_frame.shape
         ):
             heap_vis: List[Tuple[float, int, FrameData]] = (
                 self.top_fully_visible_vehicle.setdefault(vid, [])
