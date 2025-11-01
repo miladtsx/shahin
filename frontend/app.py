@@ -231,7 +231,7 @@ def create_plate():
         camera_location = data.get("camera_location")
         if camera_location:
             conn.execute(
-                "INSERT INTO traffic (plate_uuid, location) VALUES (?, ?)",
+                "INSERT INTO traffic (plate_uuid, camera_location) VALUES (?, ?)",
                 (plate_uuid, camera_location),
             )
         conn.commit()
