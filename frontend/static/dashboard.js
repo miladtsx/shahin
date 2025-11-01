@@ -108,6 +108,16 @@ function changePage(delta) {
 
 function openPlateImageModal(src, plateData) {
   document.getElementById("modalLargeImg").src = src;
+  const plateImg = document.getElementById("modalPlateImg");
+  if (plateImg) {
+    plateImg.src = `/tiny_plate_image/${plateData.uuid}/plate`;
+    plateImg.onerror = () => {
+      plateImg.style.display = "none";
+    };
+    plateImg.onload = () => {
+      plateImg.style.display = "block";
+    };
+  }
 
   const detailsDiv = document.getElementById("modalDetails");
   const plateEditorWrapperId = "plateEditorWrapper";
