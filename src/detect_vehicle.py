@@ -142,7 +142,7 @@ def process_video_stream(
             result, frame_index = process_frame(frame, frame_index, components, state)
             if result is None:
                 continue
-
+            # run detector on full frame to keep IDs stable, mask/filter afterwards
             vehicles = detect_vehicles_in_roi(
                 result.frame,
                 frame_index,
@@ -193,6 +193,7 @@ def process_frame(
     components: DetectionComponents,
     state: DetectionRuntimeState,
 ) -> Tuple[Optional[FrameProcessingResult], int]:
+    # flush outstanding selector errors every frame so they do not accumulate
     components.selector.flush_pending_failures()
 
     if frame is None:
@@ -210,6 +211,7 @@ def process_frame(
     if should_skip_frame(frame_index, state.frame_skip):
         return None, frame_index
 
+    # do not mask here; cache the mask for post-detection filtering instead
     prepare_hot_zone_mask(frame, state)
     return (
         FrameProcessingResult(frame=frame, roi=frame, frame_index=frame_index),
@@ -234,6 +236,7 @@ def should_skip_frame(frame_index: int, frame_skip: int) -> bool:
 
 
 def prepare_hot_zone_mask(frame: np.ndarray, state: DetectionRuntimeState) -> None:
+    # rebuild the hot-zone mask only when input resolution changes
     if not state.hot_zone_def:
         state.hot_zone_mask = None
         state.cached_mask_shape = None
@@ -276,7 +279,7 @@ def filter_boxes_by_hot_zone(
 ) -> Optional[np.ndarray]:
     if boxes is None or mask is None:
         return boxes
-
+    # keep detections whose centroid lies inside the mask; discard others cheaply
     h, w = mask.shape[:2]
     keep = []
     for box in boxes:
@@ -295,6 +298,7 @@ def filter_boxes_by_hot_zone(
 def suppress_edge_boxes(boxes, roi_shape, min_visible=0.6, edge_margin=8):
     if boxes is None:
         return boxes
+    # drop boxes that are mostly outside the ROI or hugging frame borders
     h, w = roi_shape[:2]
     keep = []
     for box in boxes:
