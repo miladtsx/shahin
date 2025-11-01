@@ -99,6 +99,11 @@ def list_plates():
             restricted_start = restricted_end = None
             restricted_clause = ""
             restricted_params = []
+    undetected_only = request.args.get("undetected_only", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
     query = """
     SELECT p.uuid, p.plate_text, t.timestamp, t.camera_location,
@@ -121,6 +126,9 @@ def list_plates():
     if restricted_clause:
         query += restricted_clause
         params.extend(restricted_params)
+    if undetected_only:
+        query += " AND p.plate_text = ?"
+        params.append("DETECTION_FAILED")
 
     query += " ORDER BY t.timestamp DESC LIMIT ? OFFSET ?"
     params.extend([per_page, offset])
@@ -150,6 +158,9 @@ def list_plates():
         if restricted_clause:
             count_q += restricted_clause
             count_params.extend(restricted_params)
+        if undetected_only:
+            count_q += " AND p.plate_text = ?"
+            count_params.append("DETECTION_FAILED")
         cur.execute(count_q, count_params)
         total = cur.fetchone()[0]
 
@@ -293,23 +304,33 @@ def export_traffic_csv():
     end_ts = request.args.get("end_ts")
     restricted_start = request.args.get("restricted_start")
     restricted_end = request.args.get("restricted_end")
+    undetected_only = request.args.get("undetected_only", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
-    query = "SELECT plate_uuid, camera_location, timestamp FROM traffic WHERE 1=1"
+    query = """
+        SELECT p.uuid, p.plate_text, t.camera_location, t.timestamp
+        FROM traffic t
+        JOIN plates p ON t.plate_uuid = p.uuid
+        WHERE 1=1
+    """
     params = []
     if plate_text:
-        query += " AND plate_text LIKE ?"
+        query += " AND p.plate_text LIKE ?"
         params.append(f"%{plate_text}%")
     if start_ts:
-        query += " AND timestamp >= ?"
+        query += " AND t.timestamp >= ?"
         params.append(start_ts)
     if end_ts:
-        query += " AND timestamp <= ?"
+        query += " AND t.timestamp <= ?"
         params.append(end_ts)
     if restricted_start and restricted_end:
         try:
             datetime.strptime(restricted_start, "%H:%M")
             datetime.strptime(restricted_end, "%H:%M")
-            time_expr = "strftime('%H:%M', timestamp)"
+            time_expr = "strftime('%H:%M', t.timestamp)"
             if restricted_start <= restricted_end:
                 query += f" AND {time_expr} BETWEEN ? AND ?"
                 params.extend([restricted_start, restricted_end])
@@ -318,7 +339,10 @@ def export_traffic_csv():
                 params.extend([restricted_start, restricted_end])
         except ValueError:
             pass
-    query += " ORDER BY timestamp DESC"
+    if undetected_only:
+        query += " AND p.plate_text = ?"
+        params.append("DETECTION_FAILED")
+    query += " ORDER BY t.timestamp DESC"
 
     with get_conn() as conn:
         cur = conn.cursor()
@@ -327,7 +351,7 @@ def export_traffic_csv():
 
     si = StringIO()
     writer = csv.writer(si)
-    writer.writerow(["id", "vehicle_id", "plate_text", "timestamp"])
+    writer.writerow(["uuid", "plate_text", "camera_location", "timestamp"])
     for r in rows:
         writer.writerow(r)
 

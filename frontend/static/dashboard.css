@@ -181,6 +181,17 @@ main {
   border-radius: 50%;
 }
 
+.button.icon-button.question-button {
+  font-size: 1.2em;
+  color: #6c5ce7;
+}
+
+.button.icon-button.question-button.active {
+  color: #2d3436;
+  background: rgba(108, 92, 231, 0.12);
+  border-radius: 50%;
+}
+
 .button.secondary-btn {
   background-color: #f1f3f5;
   color: #2c3e50;

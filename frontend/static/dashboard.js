@@ -5,6 +5,7 @@ let CURRENT_FILTERS = {}; // keep filters for export and paging
 const RESTRICTED_STORAGE_KEY = "restrictedHours";
 let RESTRICTED_HOURS = { start: "", end: "" };
 let RESTRICTED_FILTER_ACTIVE = false;
+let UNDETECTED_FILTER_ACTIVE = false;
 let advancedSettingsInitialized = false;
 
 // CRUD
@@ -19,6 +20,7 @@ async function fetchTraffic(query = "") {
         end_ts: CURRENT_FILTERS.end_ts || "",
         restricted_start: CURRENT_FILTERS.restricted_start || "",
         restricted_end: CURRENT_FILTERS.restricted_end || "",
+        undetected_only: CURRENT_FILTERS.undetected_only || "",
       }).toString();
 
   const res = await fetch(`/traffic?${qs}`);
@@ -733,6 +735,9 @@ function applyFilters() {
     params.append("restricted_start", CURRENT_FILTERS.restricted_start);
     params.append("restricted_end", CURRENT_FILTERS.restricted_end);
   }
+  if (UNDETECTED_FILTER_ACTIVE) {
+    params.append("undetected_only", "1");
+  }
 
   fetchTraffic(params.toString());
 }
@@ -743,6 +748,7 @@ function clearFilters() {
   document.getElementById("filterEnd").value = "";
   CURRENT_FILTERS = {};
   setRestrictedFilterState(false);
+  setUndetectedFilterState(false);
   toggleFilterBar();
   fetchTraffic();
 }
@@ -886,6 +892,35 @@ function toggleRestrictedFilter() {
   );
 }
 
+function setUndetectedFilterState(isActive) {
+  UNDETECTED_FILTER_ACTIVE = Boolean(isActive);
+  const button = document.getElementById("undetectedFilterBtn");
+  if (button) {
+    button.classList.toggle("active", UNDETECTED_FILTER_ACTIVE);
+    button.setAttribute(
+      "aria-pressed",
+      UNDETECTED_FILTER_ACTIVE ? "true" : "false"
+    );
+  }
+
+  if (UNDETECTED_FILTER_ACTIVE) {
+    CURRENT_FILTERS.undetected_only = "1";
+  } else {
+    delete CURRENT_FILTERS.undetected_only;
+  }
+}
+
+function toggleUndetectedFilter() {
+  const newState = !UNDETECTED_FILTER_ACTIVE;
+  setUndetectedFilterState(newState);
+  fetchTraffic();
+  showToast(
+    newState
+      ? "شناسایی نشده ها"
+      : "فیلتر خاموش شد"
+  );
+}
+
 // export CSV using current filters
 function exportCSV() {
   const params = new URLSearchParams({
@@ -894,6 +929,7 @@ function exportCSV() {
     end_ts: CURRENT_FILTERS.end_ts || "",
     restricted_start: CURRENT_FILTERS.restricted_start || "",
     restricted_end: CURRENT_FILTERS.restricted_end || "",
+    undetected_only: CURRENT_FILTERS.undetected_only || "",
   }).toString();
 
   window.open(`/traffic/export?${params}`, "_blank");
@@ -903,6 +939,7 @@ function exportCSV() {
 window.onload = async () => {
   document.getElementById("perPageSelect").value = String(CURRENT_PER_PAGE);
   setupAdvancedSettingsToggle();
+  setUndetectedFilterState(false);
   await initializeRestrictedHours();
   fetchTraffic();
 };
