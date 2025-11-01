@@ -112,21 +112,41 @@ function openPlateImageModal(src, plateData) {
   const detailsDiv = document.getElementById("modalDetails");
   const plateEditorWrapperId = "plateEditorWrapper";
   detailsDiv.innerHTML = `
-    <p>شناسه: ${plateData.uuid}</p>
-    <div class="plateTextModalContainer">
-      <p><strong>شماره پلاک:</strong></p>
-      <div id="${plateEditorWrapperId}" class="plate-editor"></div>
-      <input type="hidden" id="editPlateText">
+    <div class="modal-details-header">
+      <div class="modal-details-identifiers">
+        <span class="modal-chip">شناسه</span>
+        <span class="modal-id" dir="ltr">${plateData.uuid}</span>
+      </div>
     </div>
-    <div class="plateTextModalContainer">
-    <p><strong>نوع خودرو:</strong> <input class="center-text" id="editCarType" value="${plateData.car_type}"></p>
-  <p><strong>رنگ خودرو:</strong> <input class="center-text" id="editCarColor" value="${plateData.car_color}"></p>
-  <p><strong>صاحب خودرو:</strong> <input class="center-text" id="editCarOwner" value="${plateData.car_owner}"></p>
-  <p><strong>موقعیت دوربین:</strong> <input class="center-text" id="editCameraLocation" value="${
-    plateData.camera_location || ""
-  }"></p>
+    <div class="modal-details-section">
+      <h4>شماره پلاک</h4>
+      <div class="modal-plate-editor">
+        <div id="${plateEditorWrapperId}" class="plate-editor"></div>
+        <input type="hidden" id="editPlateText">
+      </div>
     </div>
-    <div class="modal-actions">
+    <div class="modal-details-section">
+      <h4>مشخصات خودرو</h4>
+      <div class="modal-details-grid">
+        <label class="modal-field">
+          <span>نوع خودرو</span>
+          <input class="modal-input" id="editCarType" value="${plateData.car_type || ""}">
+        </label>
+        <label class="modal-field">
+          <span>رنگ خودرو</span>
+          <input class="modal-input" id="editCarColor" value="${plateData.car_color || ""}">
+        </label>
+        <label class="modal-field">
+          <span>صاحب خودرو</span>
+          <input class="modal-input" id="editCarOwner" value="${plateData.car_owner || ""}">
+        </label>
+        <label class="modal-field">
+          <span>موقعیت دوربین</span>
+          <input class="modal-input" id="editCameraLocation" value="${plateData.camera_location || ""}" dir="ltr">
+        </label>
+      </div>
+    </div>
+    <div class="modal-actions modal-actions--details">
       <button class="button green-btn" onclick="confirmUpdatePlate('${plateData.uuid}')">بروزرسانی</button>
       <button class="button red-btn" onclick="confirmDeletePlate('${plateData.uuid}')">حذف</button>
     </div>
