@@ -1,5 +1,4 @@
 [] the system is designed for 1 camera only in the MVP. it must be extended if the client wants it.
-[] Filter to show only 'DETECTION_FAILED' plates
 [] the detailed view should have the highest quality of the image
 [] windows service to make sure app is always on
 [] try to detect when plate is not detected or add a confidence score
@@ -8,6 +7,7 @@
 [] auto start application, do not ask operator to start backend or dashboard.
 [] common errors reading video streams and make the app resilient.
 [] cpu vs gpu, how to tell the difference?
+[+] Filter to show only 'DETECTION_FAILED' plates
 [+] define restricted hours
 [+] remove redundant plates
 [+] save the whole image of sampling plate
