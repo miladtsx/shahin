@@ -111,6 +111,47 @@ class DB:
         except Exception as e:
             logger.exception("db_insert_error", extra={"error": str(e)})
 
+    def resolve_failed_detection(self, failed_uuid: str, plate_text: str) -> str:
+        """Update a previously recorded failed detection with the resolved plate text.
+        Returns the UUID that should be used for subsequent operations."""
+        try:
+            cur = self._conn.cursor()
+            cur.execute("SELECT plate_text FROM plates WHERE uuid = ?", (failed_uuid,))
+            row = cur.fetchone()
+            if not row:
+                return failed_uuid
+            if row[0] != "DETECTION_FAILED":
+                return failed_uuid
+
+            try:
+                cur.execute(
+                    "UPDATE plates SET plate_text = ? WHERE uuid = ?",
+                    (plate_text, failed_uuid),
+                )
+                target_uuid = failed_uuid
+            except sqlite3.IntegrityError:
+                cur.execute(
+                    "SELECT uuid FROM plates WHERE plate_text = ?", (plate_text,)
+                )
+                existing = cur.fetchone()
+                if not existing:
+                    raise
+                target_uuid = existing[0]
+                cur.execute("DELETE FROM plates WHERE uuid = ?", (failed_uuid,))
+                cur.execute(
+                    "UPDATE traffic SET plate_uuid = ? WHERE plate_uuid = ?",
+                    (target_uuid, failed_uuid),
+                )
+                cur.execute("DELETE FROM metadata WHERE plate_uuid = ?", (failed_uuid,))
+
+            self._conn.commit()
+            return target_uuid
+        except Exception as e:
+            logger.exception(
+                "db_resolve_failed_detection_error", extra={"error": str(e)}
+            )
+            return failed_uuid
+
     def get_reader_connection(self):
         """Optional: use only for read-only operations in other threads."""
         conn = sqlite3.connect(self.get_db_path(), check_same_thread=False)

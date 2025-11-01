@@ -1,19 +1,52 @@
 import cv2
 import time
-from typing import Optional
-from src.db.sqlite import DB
-from src.detectors.vehicle_detector import VehicleDetector
-from src.detectors.plate_detector import PlateDetector
-from src.selector.best_frame_selector import OnlineBestFrameSelector
-from src.score.score import score_quality
-from src.tracker.sort.sort import Sort
-from src.common_utils.video_loader import VideoLoader
-from src.common_utils.config import Config, MyConfig
-from src.common_utils.app_logger import get_logger
-from src.common_utils.resource_path import get_resource_path
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set, Tuple, Sequence
+
 import numpy as np
 
+from src.common_utils.app_logger import get_logger
+from src.common_utils.config import Config, MyConfig
+from src.common_utils.debug_image import draw_boxes, show
+from src.common_utils.resource_path import get_resource_path
+from src.common_utils.video_loader import VideoLoader
+from src.db.sqlite import DB
+from src.detectors.plate_detector import PlateDetector
+from src.detectors.vehicle_detector import VehicleDetector
+from src.score.score import score_quality
+from src.selector.best_frame_selector import BestFrameSelector
+from src.tracker.sort.sort import Sort
+
 logger = get_logger("detect", logfile="logs/app.jsonl")
+
+
+@dataclass
+class DetectionComponents:
+    vehicle_detector: VehicleDetector
+    plate_detector: PlateDetector
+    tracker: Sort
+    selector: BestFrameSelector
+
+
+@dataclass
+class DetectionRuntimeState:
+    frame_skip: int
+    rotation_angle: float
+    hot_zone_def: Optional[Sequence[Dict[str, float]]]
+    car_detection_threshold: Optional[float]
+    plate_detection_threshold: Optional[float]
+    hot_zone_mask: Optional[np.ndarray] = None
+    cached_mask_shape: Optional[Tuple[int, int]] = None
+    rotation_cache: Dict[str, Optional[object]] = field(
+        default_factory=lambda: {"shape": None, "matrix": None}
+    )
+
+
+@dataclass
+class FrameProcessingResult:
+    frame: np.ndarray
+    roi: np.ndarray
+    frame_index: int
 
 
 def run_plate_detection():
@@ -21,7 +54,18 @@ def run_plate_detection():
     conf: MyConfig = Config().config
     db = DB()
 
-    # Initialize components
+    components = initialize_components(conf, db)
+    state = build_runtime_state(conf)
+
+    logger.info("Starting continuous plate detection service...")
+
+    try:
+        continuous_detection_loop(conf, components, state)
+    finally:
+        shutdown_plate_detection(components.selector, db)
+
+
+def initialize_components(conf: MyConfig, db: DB) -> DetectionComponents:
     vehicle_detector = VehicleDetector(
         get_resource_path("res/models/vehicle_detector_yolov11n.pt"),
         [
@@ -35,209 +79,366 @@ def run_plate_detection():
     detector_plate = PlateDetector(
         get_resource_path("res/models/license_plate_detector.pt"), ["license_plate"]
     )
-    tracker = Sort(max_age=120, min_hits=1, iou_threshold=0.3)
-    selector = OnlineBestFrameSelector(
+    tracker = Sort(max_age=120 * 5, min_hits=5, iou_threshold=0.05)
+    selector = BestFrameSelector(
         db,
         score_quality,
         no_improve_patience=conf.get("no_improve_patience", 20),
         track_timeout=conf.get("track_timeout", 15),
     )
+    return DetectionComponents(
+        vehicle_detector=vehicle_detector,
+        plate_detector=detector_plate,
+        tracker=tracker,
+        selector=selector,
+    )
 
-    logger.info("Starting continuous plate detection service...")
 
-    frame_skip = max(conf.get("frame_skip", 1), 1)  # always ≥1
-    rotation_angle = float(conf.get("rotation_angle", 0) or 0)
-    hot_zone_def = conf.get("hot_zone")
-    hot_zone_mask = None
-    cached_mask_shape = None
-    car_detection_threshold = conf.get("car_detection_threshold")
-    plate_detection_threshold = conf.get("plate_detection_threshold")
-    rotation_cache = {"shape": None, "matrix": None}
+def build_runtime_state(conf: MyConfig) -> DetectionRuntimeState:
+    return DetectionRuntimeState(
+        frame_skip=max(conf.get("frame_skip", 1), 1),
+        rotation_angle=float(conf.get("rotation_angle", 0) or 0),
+        hot_zone_def=conf.get("hot_zone"),  # type: ignore
+        car_detection_threshold=conf.get("car_detection_threshold"),
+        plate_detection_threshold=conf.get("plate_detection_threshold"),
+    )
 
-    try:
-        # Continuous Monitoring
-        while True:
-            try:
-                logger.info("Initializing video loader...")
-                loader = VideoLoader(
-                    conf.get("video_path"),
-                    retry_delay=conf.get("video_retry_delay", 5),
-                    max_retry_delay=conf.get("video_max_retry_delay", 60),
+
+def continuous_detection_loop(
+    conf: MyConfig, components: DetectionComponents, state: DetectionRuntimeState
+):
+    while True:
+        try:
+            loader = create_video_loader(conf)
+            process_video_stream(loader, components, state)
+        except KeyboardInterrupt:
+            logger.info("Received shutdown signal, stopping gracefully...")
+            break
+        except Exception as e:
+            logger.error(f"Video processing failed: {e}")
+            logger.info("Restarting video processing in 1 seconds...")
+            time.sleep(1)
+
+
+def create_video_loader(conf: MyConfig) -> VideoLoader:
+    logger.info("Initializing video loader...")
+    loader = VideoLoader(
+        conf.get("video_path"),
+        retry_delay=conf.get("video_retry_delay", 5),
+        max_retry_delay=conf.get("video_max_retry_delay", 60),
+    )
+    logger.info("Starting video processing...")
+    return loader
+
+
+def process_video_stream(
+    loader: VideoLoader,
+    components: DetectionComponents,
+    state: DetectionRuntimeState,
+):
+    frame_index = 0
+    for frame in loader:
+        try:
+            result, frame_index = process_frame(frame, frame_index, components, state)
+            if result is None:
+                continue
+
+            vehicles = detect_vehicles_in_roi(
+                result.frame,
+                frame_index,
+                components.vehicle_detector,
+                state.car_detection_threshold,
+            )
+            vehicles = filter_boxes_by_hot_zone(vehicles, state.hot_zone_mask)
+            vehicles = suppress_edge_boxes(vehicles, result.frame.shape)
+            if vehicles is None or vehicles.size == 0:
+                continue
+
+            tracked_vehicles = track_vehicles(
+                vehicles, components.tracker, components.vehicle_detector
+            )
+            if not tracked_vehicles:
+                continue
+
+            display_tracked_vehicles(result.frame, tracked_vehicles)
+
+            active_boxes = get_active_boxes(tracked_vehicles)
+            vehicle_crops, crop_meta, active_ids = collect_vehicle_crops(
+                tracked_vehicles,
+                result.frame,
+                components.selector,
+                frame_index,
+            )
+
+            if vehicle_crops:
+                handle_plate_detections(
+                    vehicle_crops,
+                    crop_meta,
+                    components.plate_detector,
+                    components.selector,
+                    frame_index,
+                    result.frame,
+                    state.plate_detection_threshold,
                 )
 
-                frame_index = 0
+            finalize_tracks(components.selector, active_ids, frame_index, active_boxes)
+        except Exception as e:
+            logger.error(f"Error processing frame {frame_index}: {e}")
+            continue
 
-                logger.info("Starting video processing...")
-                # region Processing
-                for frame in loader:
-                    try:
-                        if frame is None:
-                            logger.warning("Empty frame received from loader")
-                            continue
 
-                        if rotation_angle:
-                            frame = rotate_frame(frame, rotation_angle, rotation_cache)
+def process_frame(
+    frame: Optional[np.ndarray],
+    frame_index: int,
+    components: DetectionComponents,
+    state: DetectionRuntimeState,
+) -> Tuple[Optional[FrameProcessingResult], int]:
+    components.selector.flush_pending_failures()
 
-                        # region Validate
-                        if not frame.any() or frame.mean() < 5:  # near black
-                            logger.warning("Black frame detected, camera may be dead")
-                            continue
-                        frame_index += 1
-                        if frame_index % frame_skip != 0:
-                            continue
-                        # endregion
+    if frame is None:
+        logger.warning("Empty frame received from loader")
+        return None, frame_index
 
-                        # region Hotzone
-                        if hot_zone_def:
-                            h, w = frame.shape[:2]
-                            if cached_mask_shape != (h, w):
-                                hot_zone_mask = np.zeros((h, w), dtype=np.uint8)
-                                cv2.fillPoly(
-                                    hot_zone_mask,
-                                    [
-                                        np.array(
-                                            [
-                                                (int(p["x"] * w), int(p["y"] * h))
-                                                for p in hot_zone_def
-                                            ],
-                                            dtype=np.int32,
-                                        )
-                                    ],
-                                    255,
-                                )
-                                cached_mask_shape = (h, w)
+    frame = apply_rotation_if_needed(frame, state)
 
-                            roi = cv2.bitwise_and(frame, frame, mask=hot_zone_mask)
-                        else:
-                            roi = frame
+    if is_black_frame(frame):
+        logger.warning("Black frame detected, camera may be dead")
+        return None, frame_index
 
-                        # endregion
+    frame_index += 1
 
-                        # region Detect
-                        try:
-                            vehicles = vehicle_detector.detect(
-                                roi, conf_threshold=car_detection_threshold
-                            )
-                            if vehicles.size == 0:
-                                continue
-                        except Exception as e:
-                            logger.error(
-                                f"Vehicle detection failed at frame {frame_index}: {e}"
-                            )
-                            continue
-                        # endregion
+    if should_skip_frame(frame_index, state.frame_skip):
+        return None, frame_index
 
-                        # region Track
-                        tracked = tracker.update(vehicles)
-                        if tracked.size == 0:
-                            continue
-                        tracked_vehicles = [
-                            {"id": int(trk[4]), "bbox": tuple(map(int, trk[:4]))}
-                            for trk in tracked
-                        ]
-                        # Update tracker IDs to UUIDs
-                        tracked_vehicles = [
-                            vehicle_detector.get_uuid(trk) for trk in tracked_vehicles
-                        ]
-                        if not tracked_vehicles:
-                            continue
-                        active_boxes = {
-                            trk["id"]: trk["bbox"] for trk in tracked_vehicles
-                        }
+    prepare_hot_zone_mask(frame, state)
+    return (
+        FrameProcessingResult(frame=frame, roi=frame, frame_index=frame_index),
+        frame_index,
+    )
 
-                        active_ids = (
-                            set()
-                        )  # TODO POST MVP remove and use the internal selector tracking
-                        # show(draw_boxes(frame.copy(), tracked_vehicles), "Vehicle Tracked")
-                        vehicle_crops = []
-                        crop_meta = []
-                        # endregion
 
-                        # region Selection
-                        for t in tracked_vehicles:
-                            vuuid = t["id"]
-                            active_ids.add(vuuid)
-                            selector.mark_seen(vuuid, frame_index, frame)
-                            vehicle_crop_bbox = t.get("bbox")
-                            if not vehicle_crop_bbox:
-                                continue
-                            x1, y1, x2, y2 = vehicle_crop_bbox
-                            vehicle_crop = frame[y1:y2, x1:x2]
-                            if vehicle_crop.size == 0:
-                                continue
-                            vehicle_crops.append(vehicle_crop)
-                            crop_meta.append(
-                                {
-                                    "id": vuuid,
-                                    "vehicle_bbox": vehicle_crop_bbox,
-                                    "vehicle_crop": vehicle_crop,
-                                }
-                            )
+def apply_rotation_if_needed(
+    frame: np.ndarray, state: DetectionRuntimeState
+) -> np.ndarray:
+    if not state.rotation_angle:
+        return frame
+    return rotate_frame(frame, state.rotation_angle, state.rotation_cache)
 
-                        if vehicle_crops:
-                            plates_batch = detector_plate.detect_batch(
-                                vehicle_crops,
-                                conf_threshold=plate_detection_threshold,
-                            )
 
-                            # region Score plate(s)
-                            for meta, plates in zip(crop_meta, plates_batch):
-                                if not plates:
-                                    continue
+def is_black_frame(frame: np.ndarray) -> bool:
+    return (not frame.any()) or frame.mean() < 5
 
-                                for plate in plates:
-                                    try:
 
-                                        plate_bbox = plate.get("bbox")
-                                        if not plate_bbox:
-                                            continue
-                                        vehicle_crop = meta["vehicle_crop"]
-                                        px1, py1, px2, py2 = shrink_box(*plate_bbox)
-                                        plate_crop = vehicle_crop[py1:py2, px1:px2]
-                                        if plate_crop.size == 0:
-                                            continue
+def should_skip_frame(frame_index: int, frame_skip: int) -> bool:
+    return frame_index % frame_skip != 0
 
-                                        selector.update(
-                                            meta["id"],
-                                            plate_crop,
-                                            frame_index,
-                                            full_frame=frame,
-                                            vehicle_bbox=meta.get("vehicle_bbox"),
-                                        )
-                                    except Exception as e:
-                                        logger.error(
-                                            f"Error processing plate for vehicle {meta.get('id')}: {e}"
-                                        )
-                                        continue
-                            # endregion
 
-                        # endregion
+def prepare_hot_zone_mask(frame: np.ndarray, state: DetectionRuntimeState) -> None:
+    if not state.hot_zone_def:
+        state.hot_zone_mask = None
+        state.cached_mask_shape = None
+        return
 
-                        # region Finalize
-                        to_finalize = selector.to_finalize(
-                            active_ids, frame_index, active_boxes=active_boxes
-                        )
-                        if len(to_finalize):
-                            for vuuid in to_finalize:
-                                selector.finalize(vuuid)
-                        # endregion
+    h, w = frame.shape[:2]
+    if state.cached_mask_shape != (h, w):
+        state.hot_zone_mask = build_hot_zone_mask(state.hot_zone_def, h, w)
+        state.cached_mask_shape = (h, w)
 
-                    except Exception as e:
-                        logger.error(f"Error processing frame {frame_index}: {e}")
-                        continue
-                # endregion
-            except KeyboardInterrupt:
-                logger.info("Received shutdown signal, stopping gracefully...")
-                break
-            except Exception as e:
-                logger.error(f"Video processing failed: {e}")
-                logger.info("Restarting video processing in 1 seconds...")
-                time.sleep(1)  # Wait before retrying
-    finally:
-        # Cleanup
-        logger.info("Shutting down plate detection service...")
-        db.close()
-        logger.info("Plate detection service stopped.")
+
+def build_hot_zone_mask(
+    hot_zone_def: Sequence[Dict[str, float]], height: int, width: int
+) -> np.ndarray:
+    mask = np.zeros((height, width), dtype=np.uint8)
+    polygon = np.array(
+        [(int(p["x"] * width), int(p["y"] * height)) for p in hot_zone_def],
+        dtype=np.int32,
+    )
+    cv2.fillPoly(mask, [polygon], 255)
+    return mask
+
+
+def detect_vehicles_in_roi(
+    frame: np.ndarray,
+    frame_index: int,
+    vehicle_detector: VehicleDetector,
+    detection_threshold: Optional[float],
+) -> Optional[np.ndarray]:
+    try:
+        vehicles = vehicle_detector.detect(frame, conf_threshold=detection_threshold)
+        return vehicles if vehicles.size != 0 else None
+    except Exception as e:
+        logger.error(f"Vehicle detection failed at frame {frame_index}: {e}")
+        return None
+
+
+def filter_boxes_by_hot_zone(
+    boxes: Optional[np.ndarray], mask: Optional[np.ndarray]
+) -> Optional[np.ndarray]:
+    if boxes is None or mask is None:
+        return boxes
+
+    h, w = mask.shape[:2]
+    keep = []
+    for box in boxes:
+        x1, y1, x2, y2, conf = box
+        cx = int(round((x1 + x2) / 2.0))
+        cy = int(round((y1 + y2) / 2.0))
+        if cx < 0 or cy < 0 or cx >= w or cy >= h:
+            continue
+        if mask[cy, cx] == 0:
+            continue
+        keep.append(box)
+
+    return np.array(keep, dtype=np.float64) if keep else None
+
+
+def suppress_edge_boxes(boxes, roi_shape, min_visible=0.6, edge_margin=8):
+    if boxes is None:
+        return boxes
+    h, w = roi_shape[:2]
+    keep = []
+    for box in boxes:
+        x1, y1, x2, y2, conf = box
+        box_w = max(1, x2 - x1)
+        box_h = max(1, y2 - y1)
+        visible_w = min(x2, w) - max(x1, 0)
+        visible_h = min(y2, h) - max(y1, 0)
+        visible_ratio = (visible_w * visible_h) / (box_w * box_h)
+        touches_edge = (
+            x1 <= edge_margin
+            or y1 <= edge_margin
+            or x2 >= w - edge_margin
+            or y2 >= h - edge_margin
+        )
+        if visible_ratio >= min_visible and not touches_edge:
+            keep.append(box)
+    return np.array(keep, dtype=np.float64) if keep else None
+
+
+def track_vehicles(
+    vehicles: np.ndarray, tracker: Sort, vehicle_detector: VehicleDetector
+) -> List[Dict[str, Tuple[int, int, int, int]]]:
+    tracked = tracker.update(vehicles)
+    if tracked.size == 0:
+        return []
+
+    tracked_vehicles = [
+        {"id": int(trk[4]), "bbox": tuple(map(int, trk[:4]))} for trk in tracked
+    ]
+    tracked_vehicles = [vehicle_detector.get_uuid(trk) for trk in tracked_vehicles]
+    return [t for t in tracked_vehicles if t]
+
+
+def display_tracked_vehicles(frame: np.ndarray, tracked_vehicles: List[Dict]):
+    show(draw_boxes(frame.copy(), tracked_vehicles), "Vehicle Tracked")
+
+
+def get_active_boxes(
+    tracked_vehicles: List[Dict],
+) -> Dict[str, Tuple[int, int, int, int]]:
+    return {trk["id"]: trk["bbox"] for trk in tracked_vehicles if trk.get("bbox")}
+
+
+def collect_vehicle_crops(
+    tracked_vehicles: List[Dict],
+    frame: np.ndarray,
+    selector: BestFrameSelector,
+    frame_index: int,
+) -> Tuple[List[np.ndarray], List[Dict], Set[str]]:
+    vehicle_crops: List[np.ndarray] = []
+    crop_meta: List[Dict] = []
+    active_ids: Set[str] = set()
+
+    for tracked in tracked_vehicles:
+        vehicle_id = tracked.get("id")
+        vehicle_bbox = tracked.get("bbox")
+        if not vehicle_id or not vehicle_bbox:
+            continue
+
+        active_ids.add(vehicle_id)
+        selector.mark_seen(vehicle_id, frame_index, frame)
+
+        x1, y1, x2, y2 = vehicle_bbox
+        vehicle_crop = frame[y1:y2, x1:x2]
+        if vehicle_crop.size == 0:
+            continue
+
+        vehicle_crops.append(vehicle_crop)
+        crop_meta.append(
+            {"id": vehicle_id, "vehicle_bbox": vehicle_bbox, "crop": vehicle_crop}
+        )
+
+    return vehicle_crops, crop_meta, active_ids
+
+
+def handle_plate_detections(
+    vehicle_crops: List[np.ndarray],
+    crop_meta: List[Dict],
+    plate_detector: PlateDetector,
+    selector: BestFrameSelector,
+    frame_index: int,
+    frame: np.ndarray,
+    detection_threshold: Optional[float],
+):
+    plates_batch = plate_detector.detect_batch(
+        vehicle_crops, conf_threshold=detection_threshold
+    )
+
+    for meta, plates in zip(crop_meta, plates_batch):
+        if not plates:
+            continue
+        process_plate_candidates(meta, plates, selector, frame_index, frame)
+
+
+def process_plate_candidates(
+    meta: Dict,
+    plates: List[Dict],
+    selector: BestFrameSelector,
+    frame_index: int,
+    frame: np.ndarray,
+):
+    for plate in plates:
+        try:
+            plate_bbox = plate.get("bbox")
+            if not plate_bbox:
+                continue
+
+            vehicle_crop = meta["crop"]
+            px1, py1, px2, py2 = shrink_box(*plate_bbox)
+            plate_crop = vehicle_crop[py1:py2, px1:px2]
+            if plate_crop.size == 0:
+                continue
+
+            selector.update(
+                meta["id"],
+                plate_crop,
+                frame_index,
+                full_frame=frame,
+                vehicle_bbox=meta["vehicle_bbox"],
+            )
+        except Exception as e:
+            logger.error(f"Error processing plate for vehicle {meta.get('id')}: {e}")
+            continue
+
+
+def finalize_tracks(
+    selector: BestFrameSelector,
+    active_ids: Set[str],
+    frame_index: int,
+    active_boxes: Dict[str, Tuple[int, int, int, int]],
+):
+    to_finalize = selector.to_finalize(
+        active_ids, frame_index, active_boxes=active_boxes
+    )
+    for vehicle_id in to_finalize or []:
+        selector.finalize(vehicle_id, frame_index)
+
+
+def shutdown_plate_detection(selector: BestFrameSelector, db: DB):
+    logger.info("Shutting down plate detection service...")
+    selector.flush_pending_failures(force=True)
+    db.close()
+    logger.info("Plate detection service stopped.")
 
 
 # Shrink box by a fixed margin percentage

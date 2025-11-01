@@ -10,6 +10,7 @@ from src.common_utils.config import Config, MyConfig
 from dataclasses import dataclass
 import numpy as np
 from typing import Dict, List, Tuple
+import time
 
 logger = get_logger("best_frame_selector", logfile="logs/app.jsonl")
 # @dev for easier visual debugging
@@ -25,7 +26,7 @@ class FrameData:
     full_frame: np.ndarray
 
 
-class OnlineBestFrameSelector:
+class BestFrameSelector:
     def __init__(
         self,
         db,
@@ -49,6 +50,7 @@ class OnlineBestFrameSelector:
         self.last_known_box_for_spatial_matching = {}
         self.finalized = set()
         self.lost_boxes = {}  # vid -> (bbox, last_seen_frame)
+        self.pending_failures: Dict[str, Dict] = {}
 
         # OCR components initialized once for efficiency
         self.preprocessor = PlatePreprocessor()
@@ -57,6 +59,10 @@ class OnlineBestFrameSelector:
 
         self.no_improve_patience = no_improve_patience
         self.track_timeout = track_timeout
+        failure_grace_cfg = self.config.get("failure_grace_seconds")
+        self.failure_grace_seconds = (
+            int(failure_grace_cfg) if failure_grace_cfg is not None else 10
+        )
 
     def update(
         self,
@@ -152,7 +158,7 @@ class OnlineBestFrameSelector:
                         logger.info(
                             f"Merging {new_vid[:LOG_UUID_FRACTION]} ← {lost_vid[:LOG_UUID_FRACTION]} via centroid distance"
                         )
-                        self.merge_ids(new_vid, lost_vid)
+                        self.merge_ids(new_vid, lost_vid, frame_idx)
                         self.lost_boxes.pop(lost_vid, None)
                         break
 
@@ -187,12 +193,14 @@ class OnlineBestFrameSelector:
 
         return finalized
 
-    def finalize(self, vid):
+    def finalize(self, vid, frame_idx=None):
         """Selects and saves the best frame once a vehicle leaves the hotzone."""
 
         if vid in self.finalized:
             return
         self.finalized.add(vid)
+
+        pending_record = self.pending_failures.get(vid)
 
         # Extract and remove best candidates so we can still inspect them before cleanup
         plate_candidates = self.top_plates.pop(vid, [])
@@ -207,8 +215,33 @@ class OnlineBestFrameSelector:
 
         if not best_frame_data:
             last_frame = self.last_known_full_frame.get(vid)
+            last_known_box = self.last_known_box_for_spatial_matching.get(vid)
+            last_seen_idx = self.last_seen_frame_idx.get(vid, frame_idx)
             if last_frame is not None:
+                # annotate the last frame with a box if available
+                if last_known_box is not None:
+                    x1, y1, x2, y2 = last_known_box
+                    # center, double width/height, clamp to image bounds
+                    cx = (x1 + x2) / 2.0
+                    cy = (y1 + y2) / 2.0
+                    w = (x2 - x1) * 2.0
+                    h = (y2 - y1) * 2.0
+                    new_x1 = int(max(0, cx - w / 2.0))
+                    new_y1 = int(max(0, cy - h / 2.0))
+                    new_x2 = int(min(last_frame.shape[1], cx + w / 2.0))
+                    new_y2 = int(min(last_frame.shape[0], cy + h / 2.0))
+                    draw_boxes(
+                        last_frame, [{"bbox": (new_x1, new_y1, new_x2, new_y2)}], "?"
+                    )
                 save(last_frame, vid, "failed_capture")
+                failure_record = {
+                    "timestamp": time.time(),
+                    "camera_location": self.config.get("camera_location"),
+                    "db_uuid": vid,
+                    "last_box": last_known_box,
+                    "last_seen_idx": last_seen_idx,
+                }
+                self.pending_failures[vid] = failure_record
                 self.db.insert_plate(
                     vid, "DETECTION_FAILED", self.config.get("camera_location")
                 )
@@ -218,13 +251,29 @@ class OnlineBestFrameSelector:
                 logger.error(
                     f"[Vehicle {vid[:LOG_UUID_FRACTION]}] No frame available to save."
                 )
+                failure_record = None
+
+            lost_entry = None
+            if failure_record and failure_record.get("last_box") is not None:
+                lost_entry = (
+                    failure_record["last_box"],
+                    failure_record.get("last_seen_idx", frame_idx),
+                )
+
             self._cleanup_tracking_state(vid)
+            if lost_entry and all(v is not None for v in lost_entry):
+                self.lost_boxes[vid] = lost_entry
             return
 
-        # Save best frames
-        save(best_frame_data.full_frame, vid, "original")
-        save(best_frame_data.cropped_frame, vid, "plate")
+        artifact_uuid = (
+            pending_record["db_uuid"]
+            if pending_record and pending_record.get("db_uuid")
+            else vid
+        )
 
+        # Save best frames
+        save(best_frame_data.full_frame, artifact_uuid, "original")
+        save(best_frame_data.cropped_frame, artifact_uuid, "plate")
         try:
             preprocessed = self.preprocessor.preprocess(best_frame_data.cropped_frame)
             # show(preprocessed, "Preprocessed_Final")
@@ -253,7 +302,15 @@ class OnlineBestFrameSelector:
             logger.info(
                 f"[Vehicle {vid[:LOG_UUID_FRACTION]}] Final plate: {plate_text}"
             )
-            self.db.insert_plate(vid, plate_text, self.config.get("camera_location"))
+            resolved_uuid = None
+            if pending_record and pending_record.get("db_uuid"):
+                resolved_uuid = self.db.resolve_failed_detection(
+                    pending_record["db_uuid"], plate_text
+                )
+            target_uuid = resolved_uuid or vid
+            self.db.insert_plate(
+                target_uuid, plate_text, self.config.get("camera_location")
+            )
 
         except Exception as e:
             logger.error(
@@ -261,6 +318,8 @@ class OnlineBestFrameSelector:
                 exc_info=True,
             )
         finally:
+            # Successful or not, this VID no longer needs a pending failure entry.
+            self.pending_failures.pop(vid, None)
             # Clean lightweight tracking data only (heaps already popped)
             self._cleanup_tracking_state(vid)
 
@@ -275,7 +334,7 @@ class OnlineBestFrameSelector:
         ]:
             d.pop(vid, None)
 
-    def merge_ids(self, new_vid, lost_vid):
+    def merge_ids(self, new_vid, lost_vid, frame_idx=None):
         if lost_vid in self.top_plates:
             self.top_plates[new_vid] = self.top_plates.pop(lost_vid)
         if lost_vid in self.top_fully_visible_vehicle:
@@ -288,11 +347,37 @@ class OnlineBestFrameSelector:
             self.missed_frames[new_vid] = self.missed_frames.pop(lost_vid)
         self.finalized.discard(lost_vid)
         self.lost_boxes.pop(lost_vid, None)
+        if lost_vid in self.pending_failures:
+            data = self.pending_failures.pop(lost_vid)
+            data["timestamp"] = time.time()
+            if frame_idx is not None:
+                data["last_seen_idx"] = frame_idx
+            if new_vid in self.last_known_box_for_spatial_matching:
+                data["last_box"] = self.last_known_box_for_spatial_matching[new_vid]
+            self.pending_failures[new_vid] = data
 
     def is_fully_visible(self, bbox, frame_shape):
         x1, y1, x2, y2 = bbox
         h, w = frame_shape[:2]
         return x1 >= 0 and y1 >= 0 and x2 <= w and y2 <= h
+
+    def flush_pending_failures(self, force=False):
+        if not self.pending_failures:
+            return
+
+        now = time.time()
+        to_flush = []
+        if force:
+            to_flush = list(self.pending_failures.keys())
+        else:
+            for vid, data in self.pending_failures.items():
+                ts = data.get("timestamp", now)
+                if ts is None or now - ts >= self.failure_grace_seconds:
+                    to_flush.append(vid)
+
+        for vid in to_flush:
+            self.pending_failures.pop(vid, None)
+            self.lost_boxes.pop(vid, None)
 
 
 def to_farsi_number(s):

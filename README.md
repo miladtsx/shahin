@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS traffic (
 
   ## High-Level Goal
 
-  The main purpose of OnlineBestFrameSelector is to efficiently select the highest quality license plate image for each
+  The main purpose of BestFrameSelector is to efficiently select the highest quality license plate image for each
   tracked vehicle without performing expensive processing (like OCR) on every single frame. It only runs the full OCR
   pipeline once per vehicle, after the vehicle has left the scene.
 

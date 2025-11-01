@@ -20,6 +20,7 @@ class MyConfig(TypedDict):
     hot_zone: List[Point]
     track_expiry: int  # Frames until car tracking expires
     rotation_angle: float
+    failure_grace_seconds: int
 
 
 DEFAULT_CONFIG: MyConfig = {
@@ -37,6 +38,7 @@ DEFAULT_CONFIG: MyConfig = {
     ],
     "track_expiry": 120,
     "rotation_angle": 0,
+    "failure_grace_seconds": 10,
 }
 
 
