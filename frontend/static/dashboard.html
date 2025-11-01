@@ -145,10 +145,48 @@
         <h3>ثبت پلاک جدید</h3>
         <div class="plate-editor" id="modalPlateEditor"></div>
         <input type="hidden" id="modal_plate_text" />
-        <input id="modal_car_type" placeholder="نوع خودرو" />
-        <input id="modal_car_color" placeholder="رنگ خودرو" />
-        <input id="modal_car_owner" placeholder="نام صاحب خودرو" />
-        <input id="modal_camera_location" placeholder="موقعیت دوربین" />
+        <div class="modal-details-grid">
+          <label class="modal-field">
+            <span>نوع خودرو</span>
+            <input
+              id="modal_car_type"
+              class="modal-input"
+              type="text"
+              placeholder="مثلاً سواری، وانت، موتورسیکلت"
+              autocomplete="off"
+            />
+          </label>
+          <label class="modal-field">
+            <span>رنگ خودرو</span>
+            <input
+              id="modal_car_color"
+              class="modal-input"
+              type="text"
+              placeholder="رنگ بدنه"
+              autocomplete="off"
+            />
+          </label>
+          <label class="modal-field">
+            <span>نام صاحب خودرو</span>
+            <input
+              id="modal_car_owner"
+              class="modal-input"
+              type="text"
+              placeholder="مالک یا راننده"
+              autocomplete="off"
+            />
+          </label>
+          <label class="modal-field">
+            <span>موقعیت دوربین</span>
+            <input
+              id="modal_camera_location"
+              class="modal-input"
+              type="text"
+              placeholder="مثلاً درب جنوبی، لاین غربی"
+              autocomplete="off"
+            />
+          </label>
+        </div>
         <div class="modal-actions">
           <button
             id="submitBtn"
