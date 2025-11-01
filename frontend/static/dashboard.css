@@ -648,6 +648,80 @@ td img:hover {
   color: #333;
 }
 
+
+.slider-container {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.plate-component {
+  display: inline-flex;
+  direction: ltr;
+  gap: 0.4rem;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+.plate-part {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  font-weight: 600;
+}
+
+.plate-component--fallback {
+  direction: rtl;
+  font-weight: 500;
+}
+
+.plate-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.plate-editor-fields {
+  display: inline-flex;
+  gap: 0.4rem;
+  direction: ltr;
+}
+
+.plate-editor-input {
+  width: 3rem;
+  padding: 0.3rem 0.4rem;
+  text-align: center;
+  font-size: 1.2em;
+  font-family: inherit;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.plate-editor-input--letter {
+  width: 2.5rem;
+}
+
+.plate-editor-preview {
+  display: flex;
+  justify-content: center;
+}
+
+.plate-editor-simple {
+  width: 100%;
+  max-width: 16rem;
+  text-align: center;
+  font-size: 1.2em;
+  font-family: inherit;
+  direction: ltr;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0.35rem 0.45rem;
+}
+
 /* Toast Notification */
 #toast {
   visibility: hidden;
@@ -1064,6 +1138,7 @@ td img:hover {
     opacity: 0;
     transform: translateY(-6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

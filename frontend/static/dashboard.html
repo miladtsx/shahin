@@ -8,14 +8,6 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='dashboard.css') }}"
     />
-    <style>
-      .slider-container {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: 10px;
-      }
-    </style>
   </head>
   <body>
     <div class="container">
@@ -139,12 +131,8 @@
     <div id="addPlateModal" class="modal">
       <div class="modal-content">
         <h3>ثبت پلاک جدید</h3>
-        <input
-          id="modal_plate_text"
-          maxlength="7"
-          maxlength="7"
-          placeholder="شماره پلاک را وارد کنید"
-        />
+        <div class="plate-editor" id="modalPlateEditor"></div>
+        <input type="hidden" id="modal_plate_text" />
         <input id="modal_car_type" placeholder="نوع خودرو" />
         <input id="modal_car_color" placeholder="رنگ خودرو" />
         <input id="modal_car_owner" placeholder="نام صاحب خودرو" />
@@ -615,6 +603,15 @@
       src="{{ url_for('static', filename='dashboard.js') }}"
       defer
     ></script>
+
+    <template id="plateComponentTemplate">
+      <div class="plate-component" dir="ltr">
+        <span class="plate-part" data-role="plate-prefix"></span>
+        <span class="plate-part" data-role="plate-letter"></span>
+        <span class="plate-part" data-role="plate-middle"></span>
+        <span class="plate-part" data-role="plate-suffix"></span>
+      </div>
+    </template>
   </body>
   <footer>
     © ۱۴۰۴ شاهین &mdash; تمامی حقوق محفوظ می‌باشد.

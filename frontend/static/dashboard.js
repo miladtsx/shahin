@@ -110,13 +110,21 @@ function openPlateImageModal(src, plateData) {
   document.getElementById("modalLargeImg").src = src;
 
   const detailsDiv = document.getElementById("modalDetails");
+  const plateEditorWrapperId = "plateEditorWrapper";
   detailsDiv.innerHTML = `
     <p>شناسه: ${plateData.uuid}</p>
     <div class="plateTextModalContainer">
-    <p><strong>شماره پلاک:</strong> <input class="center-text" id="editPlateText" value="${plateData.plate_text}"></p>
+      <p><strong>شماره پلاک:</strong></p>
+      <div id="${plateEditorWrapperId}" class="plate-editor"></div>
+      <input type="hidden" id="editPlateText">
+    </div>
+    <div class="plateTextModalContainer">
     <p><strong>نوع خودرو:</strong> <input class="center-text" id="editCarType" value="${plateData.car_type}"></p>
   <p><strong>رنگ خودرو:</strong> <input class="center-text" id="editCarColor" value="${plateData.car_color}"></p>
   <p><strong>صاحب خودرو:</strong> <input class="center-text" id="editCarOwner" value="${plateData.car_owner}"></p>
+  <p><strong>موقعیت دوربین:</strong> <input class="center-text" id="editCameraLocation" value="${
+    plateData.camera_location || ""
+  }"></p>
     </div>
     <div class="modal-actions">
       <button class="button green-btn" onclick="confirmUpdatePlate('${plateData.uuid}')">بروزرسانی</button>
@@ -124,8 +132,20 @@ function openPlateImageModal(src, plateData) {
     </div>
   `;
 
+  const hiddenPlateInput = document.getElementById("editPlateText");
+  if (hiddenPlateInput) {
+    const plateText = plateData.plate_text || "";
+    hiddenPlateInput.value =
+      plateText.trim().toUpperCase() === "DETECTION_FAILED"
+        ? ""
+        : normalizePlateText(plateText) || "";
+  }
+  initializePlateEditor(plateEditorWrapperId, plateData.plate_text);
   document.getElementById("imgDetailsModal").style.display = "flex";
-  document.getElementById("editPlateText").focus();
+  const firstEditorInput = document.querySelector(
+    `#${plateEditorWrapperId} input:not([type='hidden'])`
+  );
+  if (firstEditorInput) firstEditorInput.focus();
 }
 
 function closePlateImageModal() {
@@ -272,8 +292,17 @@ function hideLoading() {
 
 // Add plate modal
 function openAddPlateModal() {
+  document.getElementById("modal_plate_text").value = "";
+  document.getElementById("modal_car_type").value = "";
+  document.getElementById("modal_car_color").value = "";
+  document.getElementById("modal_car_owner").value = "";
+  document.getElementById("modal_camera_location").value = "";
+  initializePlateEditor("modalPlateEditor", "", "modal_plate_text");
   document.getElementById("addPlateModal").style.display = "flex";
-  document.getElementById("modal_plate_text").focus();
+  const firstEditorInput = document.querySelector(
+    "#modalPlateEditor input:not([type='hidden'])"
+  );
+  if (firstEditorInput) firstEditorInput.focus();
 }
 
 function closeAddPlateModal() {
@@ -282,17 +311,23 @@ function closeAddPlateModal() {
   document.getElementById("modal_car_type").value = "";
   document.getElementById("modal_car_color").value = "";
   document.getElementById("modal_car_owner").value = "";
+  document.getElementById("modal_camera_location").value = "";
+  const modalPlateEditor = document.getElementById("modalPlateEditor");
+  if (modalPlateEditor) modalPlateEditor.innerHTML = "";
 }
 
 async function submitAddManualTraffic() {
-  const plate = document.getElementById("modal_plate_text").value;
+  const hiddenModalPlate = document.getElementById("modal_plate_text");
+  const plate = normalizePlateText(hiddenModalPlate.value);
+  hiddenModalPlate.value = plate;
   const carType = document.getElementById("modal_car_type").value;
   const carColor = document.getElementById("modal_car_color").value;
   const carOwner = document.getElementById("modal_car_owner").value;
   const camera_location = document.getElementById(
     "modal_camera_location"
   ).value;
-  if (plate.length < 7) return showToast("پلاک ۸ رقم دارد", 2000);
+  if (!plate || plate.length < 7)
+    return showToast("پلاک ۸ رقم معتبر وارد کنید", 2000);
 
   try {
     const res = await fetch("/traffic", {
@@ -320,27 +355,286 @@ async function submitAddManualTraffic() {
 
 // plate component
 function createPlateComponent(plateText, plateId) {
-  const container = document.createElement("div");
-  container.className = "plate-component";
-
-  if (plateText == "DETECTION_FAILED") {
-    const input = document.createElement("label");
-    input.textContent = "شناسایی ناموفق";
-    container.appendChild(input);
-  } else {
-    [...plateText].reverse().forEach((char, idx) => {
-      const input = document.createElement("label");
-      input.textContent = toFarsiNumber(char);
-      input.dataset.charIndex = idx;
-      input.dataset.plateId = plateId;
-      input.className = "plate-glyph";
-      container.appendChild(input);
-    });
+  const raw = (plateText || "").trim();
+  if (!raw || raw === "DETECTION_FAILED") {
+    return createPlateFallback(raw || "—", plateId);
   }
 
+  const normalized = normalizePlateText(raw);
+  if (!normalized) {
+    return createPlainPlateComponent(toFarsiNumber(raw), plateId);
+  }
+
+  const template = document.getElementById("plateComponentTemplate");
+  if (!template) {
+    return createPlainPlateComponent(normalized, plateId);
+  }
+
+  const fragment = template.content.cloneNode(true);
+  const component = fragment.firstElementChild;
+  if (!component) {
+    return createPlainPlateComponent(normalized, plateId);
+  }
+
+  if (plateId) component.dataset.plateId = plateId;
+
+  const parts = splitPlateParts(normalized);
+  if (!parts) {
+    component.textContent = normalized;
+    return component;
+  }
+
+  const prefix = component.querySelector('[data-role="plate-prefix"]');
+  const letter = component.querySelector('[data-role="plate-letter"]');
+  const middle = component.querySelector('[data-role="plate-middle"]');
+  const suffix = component.querySelector('[data-role="plate-suffix"]');
+
+  if (prefix) prefix.textContent = toFarsiNumber(parts.prefix);
+  if (letter) letter.textContent = parts.letter;
+  if (middle) middle.textContent = toFarsiNumber(parts.middle);
+  if (suffix) suffix.textContent = toFarsiNumber(parts.suffix);
+
+  return component;
+}
+// plate component helpers
+
+function createPlainPlateComponent(text, plateId) {
+  const container = document.createElement("div");
+  container.className = "plate-component";
+  container.dir = "ltr";
+  if (plateId) container.dataset.plateId = plateId;
+  container.textContent = toFarsiNumber(text);
   return container;
 }
-// plate component
+
+function createPlateFallback(text, plateId) {
+  const fallback = document.createElement("div");
+  fallback.className = "plate-component plate-component--fallback";
+  if (plateId) fallback.dataset.plateId = plateId;
+  fallback.textContent =
+    text === "DETECTION_FAILED"
+      ? "شناسایی ناموفق"
+      : normalizePlateText(text) || toFarsiNumber(text) || "—";
+  return fallback;
+}
+
+function splitPlateParts(plateText) {
+  const clean = normalizePlateText(plateText);
+  if (clean.length < 7) {
+    return null;
+  }
+
+  const prefix = clean.slice(0, 2);
+  const letter = clean.slice(2, 3);
+  const middle = clean.slice(3, 6);
+  const suffix = clean.slice(6);
+
+  if (!prefix || !letter || !middle || !suffix) {
+    return null;
+  }
+
+  return { prefix, letter, middle, suffix };
+}
+
+function normalizePlateText(value) {
+  if (!value) return "";
+  return toFarsiNumber(value)
+    .replace(/[\u200c\u200f]/g, "")
+    .replace(/[^0-9\u06F0-\u06F9A-Za-z\u0600-\u06FF]/g, "")
+    .trim();
+}
+
+function initializePlateEditor(wrapperId, plateText, hiddenInputId = "editPlateText") {
+  const wrapper = document.getElementById(wrapperId);
+  const hiddenInput = document.getElementById(hiddenInputId);
+  if (!wrapper || !hiddenInput) return;
+
+  wrapper.innerHTML = "";
+
+  const isDetectionFailed =
+    (plateText || "").trim().toUpperCase() === "DETECTION_FAILED";
+  const normalizedInitial = isDetectionFailed
+    ? ""
+    : normalizePlateText(plateText);
+  let parts = splitPlateParts(normalizedInitial);
+  const allowStructured = !!parts || !normalizedInitial || isDetectionFailed;
+
+  if (!parts && allowStructured) {
+    parts = { prefix: "", letter: "", middle: "", suffix: "" };
+  }
+
+  if (!parts) {
+    createSimplePlateEditor(
+      wrapper,
+      hiddenInput,
+      isDetectionFailed ? "" : plateText
+    );
+    return;
+  }
+
+  createSegmentedPlateEditor(wrapper, hiddenInput, parts);
+}
+
+function createSegmentedPlateEditor(wrapper, hiddenInput, initialParts) {
+  const fieldsRow = document.createElement("div");
+  fieldsRow.className = "plate-editor-fields";
+
+  const segmentDefs = [
+    { key: "prefix", maxLength: 2, isNumeric: true },
+    {
+      key: "letter",
+      maxLength: 1,
+      isNumeric: false,
+      extraClass: "plate-editor-input--letter",
+    },
+    { key: "middle", maxLength: 3, isNumeric: true },
+    { key: "suffix", maxLength: 2, isNumeric: true },
+  ];
+
+  const inputs = {};
+  segmentDefs.forEach((def) => {
+    const input = createSegmentInput(
+      initialParts[def.key],
+      def.maxLength,
+      def.isNumeric,
+      def.extraClass
+    );
+    inputs[def.key] = input;
+    def.input = input;
+    fieldsRow.appendChild(input);
+  });
+
+  wrapper.appendChild(fieldsRow);
+
+  const preview = document.createElement("div");
+  preview.className = "plate-editor-preview";
+  wrapper.appendChild(preview);
+
+  const update = () => {
+    const values = {};
+    segmentDefs.forEach((def) => {
+      values[def.key] = sanitizeSegmentInput(
+        def.input,
+        def.maxLength,
+        def.isNumeric
+      );
+    });
+
+    const combined = `${values.prefix}${values.letter}${values.middle}${values.suffix}`;
+    const normalized = normalizePlateText(combined);
+    hiddenInput.value = normalized;
+    renderPlatePreview(preview, normalized || combined);
+  };
+
+  const focusInput = (input) => {
+    if (!input) return;
+    input.focus();
+    if (typeof input.select === "function") {
+      input.select();
+    }
+  };
+
+  segmentDefs.forEach((def, idx) => {
+    const input = def.input;
+
+    input.addEventListener("input", () => {
+      const sanitized = sanitizeSegmentInput(
+        input,
+        def.maxLength,
+        def.isNumeric
+      );
+
+      if (sanitized.length >= def.maxLength) {
+        const nextInput = segmentDefs[idx + 1]?.input;
+        focusInput(nextInput);
+      }
+
+      update();
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (
+        event.key === "Backspace" &&
+        input.selectionStart === 0 &&
+        input.selectionEnd === 0 &&
+        !input.value
+      ) {
+        const prevInput = segmentDefs[idx - 1]?.input;
+        if (prevInput) {
+          event.preventDefault();
+          focusInput(prevInput);
+        }
+      }
+    });
+  });
+
+  update();
+  focusInput(segmentDefs[0]?.input);
+}
+
+function createSimplePlateEditor(wrapper, hiddenInput, plateText) {
+  const input = document.createElement("input");
+  input.className = "plate-editor-simple";
+  input.dir = "ltr";
+  input.autocomplete = "off";
+  input.value = toFarsiNumber(plateText || "");
+  input.placeholder = "۱۲ب۳۴۵۶";
+
+  const preview = document.createElement("div");
+  preview.className = "plate-editor-preview";
+
+  const update = () => {
+    const normalized = normalizePlateText(input.value);
+    hiddenInput.value = normalized;
+    renderPlatePreview(preview, normalized || input.value);
+  };
+
+  input.addEventListener("input", update);
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(preview);
+
+  update();
+  input.focus();
+}
+
+function createSegmentInput(initialValue, maxLength, isNumeric, extraClass) {
+  const input = document.createElement("input");
+  input.className = "plate-editor-input";
+  if (extraClass) input.classList.add(extraClass);
+  input.maxLength = maxLength;
+  input.inputMode = isNumeric ? "numeric" : "text";
+  input.autocomplete = "off";
+  input.dir = "ltr";
+  if (!isNumeric) input.lang = "fa";
+  input.value = sanitizeSegmentValue(initialValue || "", maxLength, isNumeric);
+  return input;
+}
+
+function sanitizeSegmentInput(input, maxLength, isNumeric) {
+  const sanitized = sanitizeSegmentValue(input.value || "", maxLength, isNumeric);
+  input.value = sanitized;
+  return sanitized;
+}
+
+function sanitizeSegmentValue(value, maxLength, isNumeric) {
+  let cleaned = value || "";
+  if (isNumeric) {
+    cleaned = cleaned.replace(/[^\d\u06F0-\u06F9]/g, "");
+    cleaned = toFarsiNumber(cleaned);
+  } else {
+    cleaned = cleaned.replace(/[\d\u06F0-\u06F9]/g, "");
+    cleaned = cleaned.replace(/\s+/g, "");
+  }
+  return Array.from(cleaned).slice(0, maxLength).join("");
+}
+
+function renderPlatePreview(container, value) {
+  if (!container) return;
+  container.innerHTML = "";
+  const previewValue = value && value.trim() ? value : "—";
+  container.appendChild(createPlateComponent(previewValue));
+}
 
 // helper
 function toFarsiNumber(str) {
@@ -382,8 +676,13 @@ function applyFilters() {
 
   const params = new URLSearchParams();
   if (plate) {
-    CURRENT_FILTERS.plate_text = toFarsiNumber(plate);
-    params.append("plate_text", toFarsiNumber(plate));
+    const normalizedPlate = normalizePlateText(plate);
+    if (normalizedPlate) {
+      CURRENT_FILTERS.plate_text = normalizedPlate;
+      params.append("plate_text", normalizedPlate);
+    } else {
+      delete CURRENT_FILTERS.plate_text;
+    }
   } else {
     delete CURRENT_FILTERS.plate_text;
   }
