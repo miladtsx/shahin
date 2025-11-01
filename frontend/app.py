@@ -232,6 +232,17 @@ def update_plate(plate_uuid):
     try:
         data = request.json
         with get_conn() as conn:
+            plate_text = (data.get("plate_text") or "").strip()
+            if plate_text:
+                conn.execute(
+                    """
+                        UPDATE plates
+                        SET plate_text = ?
+                        WHERE uuid = ?
+                    """,
+                    (plate_text, plate_uuid),
+                )
+
             conn.execute(
                 """
                     INSERT INTO metadata (plate_uuid, car_type, car_color, car_owner)
@@ -258,7 +269,7 @@ def update_plate(plate_uuid):
                         SET camera_location = ?
                         WHERE plate_uuid = ?
                     """,
-                    (plate_uuid, camera_location),
+                    (camera_location, plate_uuid),
                 )
             conn.commit()
     except Exception as e:
