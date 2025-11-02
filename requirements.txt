@@ -5,3 +5,4 @@ ultralytics==8.3.170
 scikit-image==0.25.2
 filterpy>=1.4.5
 pystray==0.19.5
+flask==3.1.2

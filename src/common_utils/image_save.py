@@ -11,7 +11,7 @@ def save(image, vid, file_name, path=None):
     """
     Save image in user directory
     """
-    file_path = path or f"{get_data_path("out")}/{vid}/"
+    file_path = path or f"{get_data_path('out')}/{vid}/"
     try:
         os.makedirs(file_path, exist_ok=True)
         cv2.imwrite(os.path.join(file_path, f"{file_name}.jpg"), image)

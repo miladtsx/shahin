@@ -2,9 +2,25 @@ import logging
 import logging.handlers
 import json
 import os
+import sys
 import time
 import uuid
 from contextlib import contextmanager
+from pathlib import Path
+
+from .resource_path import get_data_path
+
+
+def _relative_log_target(base: Path, candidate: Path) -> Path:
+    """Return a path under base, stripping leading 'logs/' directories."""
+    parts = list(candidate.parts)
+    if parts and parts[0] == ".":
+        parts = parts[1:]
+    if parts and parts[0].lower() == "logs":
+        parts = parts[1:]
+    if not parts:
+        parts = [candidate.name]
+    return base.joinpath(*parts)
 
 
 class JSONFormatter(logging.Formatter):
@@ -89,12 +105,25 @@ def get_logger(
 
     logger.setLevel(level)
 
-    # ensure directory exists
-    logdir = os.path.dirname(logfile) or "."
-    os.makedirs(logdir, exist_ok=True)
+    log_path = Path(logfile)
+    if log_path.is_absolute():
+        resolved_log_path = log_path
+    else:
+        override = os.getenv("SHAHIN_LOG_DIR")
+        if override:
+            base_dir = Path(override).expanduser()
+            resolved_log_path = _relative_log_target(base_dir, log_path)
+        elif getattr(sys, "frozen", False):
+            base_dir = Path(get_data_path("logs"))
+            resolved_log_path = _relative_log_target(base_dir, log_path)
+        else:
+            resolved_log_path = Path.cwd() / log_path
+    log_path = resolved_log_path.resolve()
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
 
     fh = logging.handlers.RotatingFileHandler(
-        logfile, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+        str(log_path), maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
     )
     fh.setFormatter(JSONFormatter())
     fh.setLevel(level)

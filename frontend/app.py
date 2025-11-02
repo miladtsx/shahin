@@ -1,12 +1,8 @@
 from io import StringIO
-import os, sys
+import os
 import sqlite3
 import uuid
-import webbrowser
 import yaml
-import subprocess
-import signal
-import time
 import cv2
 from datetime import datetime
 from flask import (
@@ -18,7 +14,7 @@ from flask import (
     Response,
 )
 import csv
-from common_utils.resource_path import get_data_path
+from frontend.common_utils.resource_path import get_data_path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -370,33 +366,6 @@ def get_config_path():
     return get_data_path("config.yaml")
 
 
-def start_backend():
-    global backend_process
-    if backend_process is None or backend_process.poll() is not None:
-        # TODO: in production use absolute paths
-        backend_process = subprocess.Popen(
-            [sys.executable, "main.py"], preexec_fn=os.setsid
-        )
-
-
-def stop_backend():
-    global backend_process
-    if backend_process and backend_process.poll() is None:
-        os.killpg(os.getpgid(backend_process.pid), signal.SIGTERM)
-        try:
-            backend_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            os.killpg(os.getpgid(backend_process.pid), signal.SIGKILL)
-    backend_process = None
-
-
-def restart_backend():
-    stop_backend()
-    # Give it a moment to release resources if needed
-    time.sleep(5)
-    start_backend()
-
-
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     config_path = get_config_path()
@@ -413,7 +382,6 @@ def settings():
         with open(config_path, "w") as f:
             yaml.safe_dump(config, f)
 
-        # restart_backend()
         return jsonify({"status": "در حال اجرا با تنظیمات جدید"})
 
     # GET
@@ -458,11 +426,7 @@ def backend_status():
     return jsonify({"status": "غیرفعال"})
 
 
-def run_app():
-    app.run(port=PORT, debug=True)
-
-
-if __name__ == "__main__":
+def ensure_database():
     db_path = get_db_path()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     if not os.path.exists(db_path):
@@ -502,12 +466,12 @@ if __name__ == "__main__":
             )
             conn.commit()
 
-    # Thread(target=run_app).start()
-    try:
-        start_backend()
-        import atexit
 
-        atexit.register(stop_backend)
-    except Exception as e:
-        print(f"Error starting backend: {e}")
-    run_app()
+def run_dashboard(host="127.0.0.1", port=PORT, debug=False):
+    ensure_database()
+    app.run(host=host, port=port, debug=debug)
+
+
+if __name__ == "__main__":
+    ensure_database()
+    run_dashboard(debug=True)
