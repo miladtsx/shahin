@@ -9,6 +9,7 @@ from pathlib import Path
 from pystray import Icon, Menu, MenuItem
 from PIL import Image, ImageDraw
 
+from src.common_utils.app_logger import get_logger
 from src.common_utils.resource_path import get_resource_path
 
 BACKEND = "backend"
@@ -26,6 +27,8 @@ tray_config = {
     "debug": False,
     "url": DEFAULT_DASHBOARD_URL,
 }
+
+logger = get_logger("tray.app")
 
 
 def build_command(mode, extra_args=None):
@@ -48,12 +51,15 @@ def _spawn_process(mode, extra_args=None):
 
 def start_backend():
     if BACKEND in processes and processes[BACKEND].poll() is None:
+        logger.info("Backend already running", extra={"component": BACKEND})
         return
+    logger.info("Starting backend process", extra={"component": BACKEND})
     processes[BACKEND] = _spawn_process(BACKEND)
     _update_icon()
 
 
 def stop_backend():
+    logger.info("Stopping backend process", extra={"component": BACKEND})
     _stop_process(BACKEND)
 
 
@@ -65,6 +71,10 @@ def start_dashboard(open_browser=True, url=None):
     args = ["--host", tray_config["host"], "--port", str(tray_config["port"])]
     if tray_config["debug"]:
         args.append("--debug")
+    logger.info(
+        "Starting dashboard process",
+        extra={"component": DASHBOARD, "host": tray_config["host"], "port": tray_config["port"]},
+    )
     processes[DASHBOARD] = _spawn_process(DASHBOARD, args)
     _update_icon()
     if open_browser:
@@ -72,10 +82,12 @@ def start_dashboard(open_browser=True, url=None):
 
 
 def stop_dashboard():
+    logger.info("Stopping dashboard process", extra={"component": DASHBOARD})
     _stop_process(DASHBOARD)
 
 
 def stop_all(icon_obj=None, item=None):
+    logger.info("Stopping all components")
     stop_dashboard()
     stop_backend()
     if icon_obj:
@@ -85,10 +97,15 @@ def stop_all(icon_obj=None, item=None):
 def _stop_process(name):
     proc = processes.pop(name, None)
     if not proc:
+        logger.info("No process to stop", extra={"component": name})
         _update_icon()
         return
 
     if proc.poll() is not None:
+        logger.info(
+            "Process already exited",
+            extra={"component": name, "returncode": proc.returncode},
+        )
         _update_icon()
         return
 
@@ -97,10 +114,18 @@ def _stop_process(name):
             proc.send_signal(signal.CTRL_BREAK_EVENT)
         else:
             proc.terminate()
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+            except (ProcessLookupError, OSError):
+                pass
+    except (ProcessLookupError, OSError):
+        # Process may already have exited between poll and terminate; that's OK.
+        pass
     finally:
+        logger.info("Process stopped", extra={"component": name})
         _update_icon()
 
 

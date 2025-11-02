@@ -14,6 +14,7 @@ from flask import (
     Response,
 )
 import csv
+from src.common_utils.app_logger import get_logger
 from frontend.common_utils.resource_path import get_data_path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,6 +24,8 @@ PORT = 5000
 app = Flask(
     __name__, static_folder=os.path.join(BASE_DIR, "static"), template_folder=BASE_DIR
 )
+
+logger = get_logger("frontend.app")
 
 
 def get_db_path():
@@ -236,8 +239,9 @@ def create_plate():
 
 @app.route("/update/<string:plate_uuid>", methods=["PUT"])
 def update_plate(plate_uuid):
+    data = None
     try:
-        data = request.json
+        data = request.json or {}
         with get_conn() as conn:
             plate_text = (data.get("plate_text") or "").strip()
             if plate_text:
@@ -280,6 +284,10 @@ def update_plate(plate_uuid):
                 )
             conn.commit()
     except Exception as e:
+        logger.exception(
+            "Failed to update plate metadata",
+            extra={"plate_uuid": plate_uuid, "payload": data},
+        )
         return jsonify({"status": f"Error: {str(e)}"})
     return jsonify({"status": "updated"})
 
