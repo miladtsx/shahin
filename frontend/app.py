@@ -185,7 +185,7 @@ def list_plates():
 @app.route("/traffic", methods=["POST"])
 def create_plate():
     data = request.json
-    plate_uuid = str(uuid.uuid4())
+    plate_uuid = None
     plate_text = data.get("plate_text")
 
     # TODO validate input
@@ -226,13 +226,12 @@ def create_plate():
             ),
         )
 
-        # insert traffic record
+        # insert traffic record even if camera location is missing so the dashboard can list it
         camera_location = data.get("camera_location")
-        if camera_location:
-            conn.execute(
-                "INSERT INTO traffic (plate_uuid, camera_location) VALUES (?, ?)",
-                (plate_uuid, camera_location),
-            )
+        conn.execute(
+            "INSERT INTO traffic (plate_uuid, camera_location) VALUES (?, ?)",
+            (plate_uuid, camera_location),
+        )
         conn.commit()
     return jsonify({"status": "created", "uuid": plate_uuid})
 
