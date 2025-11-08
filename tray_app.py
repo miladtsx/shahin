@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw
 
 from src.common_utils.app_logger import get_logger
 from src.common_utils.resource_path import get_resource_path
+from src.common_utils import license_utils
 
 BACKEND = "backend"
 DASHBOARD = "dashboard"
@@ -22,6 +23,7 @@ CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
 
 processes = {}
 icon = None
+_activation_window_open = threading.Lock()
 tray_config = {
     "host": "127.0.0.1",
     "port": 5000,
@@ -57,9 +59,23 @@ def _spawn_process(mode, extra_args=None):
     return proc
 
 
+def _license_allows(component):
+    status = license_utils.license_status(force_reload=True)
+    if status.valid:
+        return True
+    logger.warning(
+        "License missing or invalid",
+        extra={"component": component, "reason": status.reason},
+    )
+    _open_activation_dialog(status.reason)
+    return False
+
+
 def start_backend():
     if BACKEND in processes and processes[BACKEND].poll() is None:
         logger.info("Backend already running", extra={"component": BACKEND})
+        return
+    if not _license_allows(BACKEND):
         return
     logger.info("Starting backend process", extra={"component": BACKEND})
     processes[BACKEND] = _spawn_process(BACKEND)
@@ -75,6 +91,8 @@ def start_dashboard(open_browser=True, url=None):
     if DASHBOARD in processes and processes[DASHBOARD].poll() is None:
         if open_browser:
             webbrowser.open(url or tray_config["url"])
+        return
+    if not _license_allows(DASHBOARD):
         return
     args = ["--host", tray_config["host"], "--port", str(tray_config["port"])]
     if tray_config["debug"]:
@@ -191,6 +209,87 @@ def parse_args():
     return parser.parse_args()
 
 
+def _open_activation_dialog(reason=None):
+    def _launch():
+        acquired = _activation_window_open.acquire(blocking=False)
+        if not acquired:
+            return
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+
+            root = tk.Tk()
+            root.title("Shahin Activation")
+            root.resizable(False, False)
+            fingerprint = ""
+            try:
+                fingerprint = license_utils.get_machine_fingerprint()
+            except Exception as exc:  # pragma: no cover - UI helper
+                fingerprint = f"<error: {exc}>"
+
+            tk.Label(root, text="Machine fingerprint:").grid(
+                row=0, column=0, sticky="w", padx=10, pady=(10, 0)
+            )
+
+            fp_value = tk.Entry(root, width=60)
+            fp_value.insert(0, fingerprint)
+            fp_value.configure(state="readonly")
+            fp_value.grid(row=1, column=0, columnspan=2, padx=10, pady=5)
+
+            def copy_fp():
+                root.clipboard_clear()
+                root.clipboard_append(fingerprint)
+                messagebox.showinfo("Copied", "Fingerprint copied to clipboard.")
+
+            copy_btn = tk.Button(root, text="Copy fingerprint", command=copy_fp)
+            copy_btn.grid(row=1, column=2, padx=5, pady=5)
+
+            tk.Label(root, text="Paste the signed license key below:").grid(
+                row=2, column=0, columnspan=3, sticky="w", padx=10, pady=(10, 0)
+            )
+
+            license_input = tk.Text(root, height=5, width=60, wrap="word")
+            license_input.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
+
+            if reason:
+                tk.Label(
+                    root, text=f"Last error: {reason}", fg="red", anchor="w"
+                ).grid(row=4, column=0, columnspan=3, sticky="w", padx=10)
+
+            def on_validate():
+                blob = license_input.get("1.0", "end").strip()
+                if not blob:
+                    messagebox.showwarning("Missing input", "Please paste the license key.")
+                    return
+                status = license_utils.activate_license(blob)
+                if status.valid:
+                    messagebox.showinfo("Activation successful", "License stored successfully.")
+                    root.destroy()
+                else:
+                    messagebox.showerror(
+                        "Activation failed",
+                        f"License rejected ({status.reason}). Please verify and try again.",
+                    )
+
+            action_btn = tk.Button(root, text="Validate", command=on_validate)
+            action_btn.grid(row=5, column=0, padx=10, pady=(5, 10), sticky="w")
+
+            tk.Button(root, text="Close", command=root.destroy).grid(
+                row=5, column=2, padx=10, pady=(5, 10), sticky="e"
+            )
+
+            root.mainloop()
+        except Exception as exc:  # pragma: no cover - UI helper
+            logger.exception(
+                "activation_dialog_failed",
+                extra={"error": str(exc)},
+            )
+        finally:
+            _activation_window_open.release()
+
+    threading.Thread(target=_launch, name="activation-dialog", daemon=True).start()
+
+
 def tray_main(args):
     global icon
     global tray_config
@@ -205,14 +304,18 @@ def tray_main(args):
         MenuItem("Stop backend", lambda _: stop_backend()),
         MenuItem("Start dashboard", lambda _: start_dashboard()),
         MenuItem("Stop dashboard", lambda _: stop_dashboard()),
+        MenuItem("Activate…", lambda _: _open_activation_dialog()),
         MenuItem("Quit", stop_all),
     )
 
     icon = Icon("ShahinApp", _create_image(), "Shahin", menu)
 
     if not args.no_autostart:
-        start_backend()
-        start_dashboard(open_browser=not args.no_browser, url=tray_config["url"])
+        if license_utils.license_is_valid():
+            start_backend()
+            start_dashboard(open_browser=not args.no_browser, url=tray_config["url"])
+        else:
+            logger.warning("Skipping autostart: license missing or invalid")
 
     icon.run()
 
@@ -226,6 +329,13 @@ def backend_main():
 def dashboard_main(host, port, debug):
     from frontend.app import run_dashboard
 
+    status = license_utils.license_status(force_reload=True)
+    if not status.valid:
+        logger.error(
+            "Dashboard blocked: license invalid",
+            extra={"reason": status.reason},
+        )
+        sys.exit(3)
     run_dashboard(host=host, port=port, debug=debug)
 
 

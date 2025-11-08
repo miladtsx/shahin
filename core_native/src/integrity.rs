@@ -31,6 +31,9 @@ pub(crate) fn self_check(py: Python<'_>) -> PyResult<bool> {
 }
 
 fn default_self_check(py: Python<'_>) -> Option<bool> {
+    if !crate::hardened_permits("integrity::self_check") {
+        return Some(false);
+    }
     let (manifest_json, manifest_sig_b64) = embedded_manifest()?;
     let manifest_json = manifest_json.trim();
     let manifest_sig_b64 = manifest_sig_b64.trim();

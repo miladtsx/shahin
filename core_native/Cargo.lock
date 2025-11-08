@@ -59,6 +59,7 @@ dependencies = [
  "aead",
  "anyhow",
  "base64",
+ "libc",
  "object",
  "pyo3",
  "rand",

@@ -3,6 +3,11 @@ use ring::aead::{self, Aad, LessSafeKey, UnboundKey, NONCE_LEN};
 
 #[pyfunction]
 pub(crate) fn seal(key_material: &[u8], plaintext: &[u8]) -> PyResult<Vec<u8>> {
+    if !crate::hardened_permits("crypto::seal") {
+        return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+            "operation blocked by hardened guard",
+        ));
+    }
     let unbound = UnboundKey::new(&aead::AES_256_GCM, key_material)
         .map_err(|_| PyErr::new::<pyo3::exceptions::PyValueError, _>("bad key"))?;
     let key = LessSafeKey::new(unbound);
@@ -21,6 +26,11 @@ pub(crate) fn seal(key_material: &[u8], plaintext: &[u8]) -> PyResult<Vec<u8>> {
 
 #[pyfunction]
 pub(crate) fn unseal(key_material: &[u8], nonce_and_ct: &[u8]) -> PyResult<Vec<u8>> {
+    if !crate::hardened_permits("crypto::unseal") {
+        return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+            "operation blocked by hardened guard",
+        ));
+    }
     if nonce_and_ct.len() < NONCE_LEN {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("short"));
     }

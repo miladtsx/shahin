@@ -34,6 +34,14 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Offline Activation
+
+- Launch `tray_app.py` in tray mode (e.g. `python tray_app.py`) — the tray icon will appear even without a license.
+- Choose **Activate…** from the tray menu, copy the displayed machine fingerprint, and send it to the release team.
+- The release team runs `python scripts/generate_license.py --fingerprint <fp> --customer <name>` (using the private key in `.keys/`) and sends back the resulting string.
+- Paste the signed blob into the activation dialog and click **Validate**. A valid license is stored at `~/.shahin/license.json`.
+- Once activated, Shahin keeps both backend and dashboard services alive automatically. During preview builds this behavior is mocked (TODO: wire up Windows service + startup registration), but the UX contract already assumes no manual startup is required—services restart on login and stay resident unless the user explicitly quits them via the tray or Task Manager.
+
 ## Demo Setup
 
 ### Fake plates
@@ -139,5 +147,3 @@ CREATE TABLE IF NOT EXISTS traffic (
 
 ## Document
 [link](https://docs.google.com/document/d/1_Q-legmeUw9Q5sP0G9K7ayoIYyhgSnebhKUnHNxscoQ/edit?tab=t.0#heading=h.z6ne0og04bp5)
-
-

@@ -15,6 +15,7 @@ from flask import (
 )
 import csv
 from src.common_utils.app_logger import get_logger
+from src.common_utils import license_utils
 from frontend.common_utils.resource_path import get_data_path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -474,11 +475,20 @@ def ensure_database():
             conn.commit()
 
 
+def _require_valid_license():
+    status = license_utils.license_status(force_reload=True)
+    if not status.valid:
+        logger.critical(
+            "dashboard_license_invalid", extra={"reason": status.reason}
+        )
+        raise SystemExit("License invalid or missing. Activate via the tray.")
+
+
 def run_dashboard(host="127.0.0.1", port=PORT, debug=False):
+    _require_valid_license()
     ensure_database()
     app.run(host=host, port=port, debug=debug)
 
 
 if __name__ == "__main__":
-    ensure_database()
     run_dashboard(debug=True)

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from src.detect_vehicle import run_plate_detection
 from src.common_utils.app_logger import get_logger, log_duration
+from src.common_utils import license_utils, native_guard
 import sys
 import os
+import time
 
 logger = get_logger("app", logfile="logs/app.jsonl")
 
@@ -37,6 +39,10 @@ def _check_integrity_and_authorization() -> bool:
     if expected:
         ok = False
         try:
+            if not native_guard.allow_native_call("core_native.verify_file_hash"):
+                time.sleep(native_guard.degraded_delay())
+                logger.warning("integrity_guard_blocked", extra={"file": __file__})
+                return False
             ok = core_native.verify_file_hash(__file__, expected)
         except Exception as e:
             logger.exception("native_verify_failed", extra={"error": str(e)})
@@ -53,17 +59,25 @@ def _check_integrity_and_authorization() -> bool:
 
     # check machine fingerprint if requested
     try:
-        fp = core_native.get_machine_fingerprint()
-        allowed = os.environ.get("SHAHIN_ALLOWED_FINGERPRINTS")
-        if allowed:
-            allowed_set = {s.strip() for s in allowed.split(",") if s.strip()}
-            if fp not in allowed_set:
-                logger.error("machine_not_authorized", extra={"fingerprint": fp})
-                return False
+        fp = license_utils.get_machine_fingerprint()
         logger.info("machine_fingerprint", extra={"fingerprint": fp})
     except Exception as e:
         logger.exception("fingerprint_failed", extra={"error": str(e)})
         return False
+
+    status = license_utils.license_status(force_reload=True)
+    if not status.valid:
+        logger.error("license_invalid", extra={"reason": status.reason})
+        return False
+    payload = status.payload or {}
+    logger.info(
+        "license_valid",
+        extra={
+            "customer": payload.get("customer"),
+            "license_id": payload.get("license_id"),
+            "expiry": payload.get("exp"),
+        },
+    )
 
     return True
 
@@ -71,7 +85,7 @@ def _check_integrity_and_authorization() -> bool:
 def main():
     logger.info("application_start", extra={"event": "application_start"})
     try:
-        #TODO do the check not only on startup, but also on different critical paths
+        # TODO do the check not only on startup, but also on different critical paths
         if not _check_integrity_and_authorization():
             logger.error("startup_checks_failed")
             sys.exit(2)

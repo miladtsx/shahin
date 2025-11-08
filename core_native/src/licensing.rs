@@ -23,6 +23,9 @@ pub(crate) fn verify_signed_blob_with_key(
 
 #[pyfunction]
 pub(crate) fn verify_signed_blob(payload_json: &str, sig_b64: &str) -> PyResult<bool> {
+    if !crate::hardened_permits("licensing::verify_signed_blob") {
+        return Ok(false);
+    }
     verify_signed_blob_with_key(payload_json, sig_b64, super::LIC_PUB_KEY_DER)
 }
 

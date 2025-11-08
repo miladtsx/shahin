@@ -1,6 +1,8 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
 mod crypto;
+#[cfg(feature = "hardened")]
+mod hardened;
 mod hwid;
 mod integrity;
 mod licensing;
@@ -16,6 +18,9 @@ use std::fs;
 use std::path::Path;
 
 pub fn hwid_signals() -> Vec<String> {
+    if !hardened_permits("hwid_signals") {
+        return Vec::new();
+    }
     collect_hwid_signals()
 }
 
@@ -36,11 +41,17 @@ fn k_of_n_match(stored_hashes: &[Vec<u8>], current_signals: &[String], k: usize)
 
 #[pyfunction]
 fn derive_hwid() -> PyResult<Vec<String>> {
+    if !hardened_permits("derive_hwid") {
+        return Ok(Vec::new());
+    }
     Ok(hwid_signals())
 }
 
 #[pyfunction]
 fn verify_file_hash(path: &str, expected_hex: &str) -> PyResult<bool> {
+    if !hardened_permits("verify_file_hash") {
+        return Ok(false);
+    }
     let expected = expected_hex.trim();
     if expected.is_empty() {
         return Ok(false);
@@ -53,6 +64,9 @@ fn verify_file_hash(path: &str, expected_hex: &str) -> PyResult<bool> {
 
 #[pyfunction]
 fn get_machine_fingerprint() -> PyResult<String> {
+    if !hardened_permits("get_machine_fingerprint") {
+        return Ok(debug_blocked_fingerprint());
+    }
     let signals = hwid_signals();
     let fingerprint = fingerprint_from_signals(&signals).ok_or_else(|| {
         PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("no hardware signals available")
@@ -61,6 +75,9 @@ fn get_machine_fingerprint() -> PyResult<String> {
 }
 
 fn fingerprint_from_signals(signals: &[String]) -> Option<String> {
+    if !hardened_permits("fingerprint_from_signals") {
+        return None;
+    }
     if signals.is_empty() {
         return None;
     }
@@ -72,7 +89,7 @@ fn fingerprint_from_signals(signals: &[String]) -> Option<String> {
     Some(to_lower_hex(ctx.finish().as_ref()))
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     let digest = digest::digest(&digest::SHA256, bytes);
     to_lower_hex(digest.as_ref())
 }
@@ -99,11 +116,31 @@ fn core_native(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
+#[inline]
+pub(crate) fn hardened_permits(label: &str) -> bool {
+    #[cfg(feature = "hardened")]
+    {
+        return hardened::guard_operation(label);
+    }
+    #[cfg(not(feature = "hardened"))]
+    {
+        let _ = label;
+        true
+    }
+}
+
+fn debug_blocked_fingerprint() -> String {
+    "debugger-blocked".to_string()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use std::env;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(feature = "hardened")]
+    use crate::hardened;
 
     #[test]
     fn public_keys_are_loaded() {
@@ -138,5 +175,26 @@ mod test {
         let fp1 = fingerprint_from_signals(&signals).expect("fp1");
         let fp2 = fingerprint_from_signals(&signals).expect("fp2");
         assert_eq!(fp1, fp2);
+    }
+
+    #[cfg(not(feature = "hardened"))]
+    #[test]
+    fn hardened_guard_is_noop_without_feature() {
+        assert!(hardened_permits("test_gate"));
+    }
+
+    #[cfg(feature = "hardened")]
+    #[test]
+    fn hardened_beacon_smoke_test() {
+        assert!(hardened_permits("smoke_beacon"));
+    }
+
+    #[cfg(feature = "hardened")]
+    #[test]
+    fn hardened_beacon_blocks_after_trip() {
+        let engine = hardened::beacon::global();
+        engine.force_trip();
+        assert!(!hardened_permits("trip_block"));
+        engine.reset();
     }
 }
