@@ -1,7 +1,7 @@
 use std::process::Command;
 
-use winreg::RegKey;
 use winreg::enums::HKEY_LOCAL_MACHINE;
+use winreg::RegKey;
 
 use super::HwidCollector;
 

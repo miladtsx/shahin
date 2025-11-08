@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use ring::aead::{self, Aad, LessSafeKey, NONCE_LEN, UnboundKey};
+use ring::aead::{self, Aad, LessSafeKey, UnboundKey, NONCE_LEN};
 
 #[pyfunction]
 pub(crate) fn seal(key_material: &[u8], plaintext: &[u8]) -> PyResult<Vec<u8>> {
@@ -38,4 +38,31 @@ pub(crate) fn unseal(key_material: &[u8], nonce_and_ct: &[u8]) -> PyResult<Vec<u
         .open_in_place(nonce, Aad::empty(), &mut ct_buf)
         .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("open fail"))?;
     Ok(pt.to_vec())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seal_and_unseal_roundtrip() {
+        let key = [0xAA; 32];
+        let plaintext = b"test payload";
+
+        let sealed = seal(&key, plaintext).expect("seal");
+        let unsealed = unseal(&key, &sealed).expect("unseal");
+        assert_eq!(unsealed, plaintext);
+    }
+
+    #[test]
+    fn unseal_rejects_short_ciphertext() {
+        let key = [0xAA; 32];
+        assert!(unseal(&key, &[0u8; 8]).is_err());
+    }
+
+    #[test]
+    fn seal_rejects_short_key() {
+        let key = [0xAA; 16];
+        assert!(seal(&key, b"payload").is_err());
+    }
 }

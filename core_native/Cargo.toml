@@ -6,6 +6,14 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
+[profile.release]
+opt-level = "z"        # or "3" for perf; "z" reduces size
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = false
+strip = "debuginfo"    # nightly/more complex; else strip separately
+
 [dependencies]
 pyo3 = { version = "0.22", features = ["extension-module"] }
 aead = "0.5.2"
@@ -15,7 +23,7 @@ ring = "0.17.14"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 base64 = "0.22.1"
-object = "0.36"
+object = { version = "0.36", features = ["write"] }
 
 [target."cfg(windows)".dependencies]
 winreg = "0.55"

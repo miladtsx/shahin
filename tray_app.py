@@ -5,6 +5,7 @@ import subprocess
 import sys
 import webbrowser
 from pathlib import Path
+import threading
 
 from pystray import Icon, Menu, MenuItem
 from PIL import Image, ImageDraw
@@ -46,7 +47,14 @@ def _spawn_process(mode, extra_args=None):
         kwargs["creationflags"] = CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
-    return subprocess.Popen(build_command(mode, extra_args), **kwargs)
+    proc = subprocess.Popen(build_command(mode, extra_args), **kwargs)
+    threading.Thread(
+        target=_watch_process_exit,
+        args=(mode, proc),
+        name=f"{mode}-exit-watcher",
+        daemon=True,
+    ).start()
+    return proc
 
 
 def start_backend():
@@ -73,7 +81,11 @@ def start_dashboard(open_browser=True, url=None):
         args.append("--debug")
     logger.info(
         "Starting dashboard process",
-        extra={"component": DASHBOARD, "host": tray_config["host"], "port": tray_config["port"]},
+        extra={
+            "component": DASHBOARD,
+            "host": tray_config["host"],
+            "port": tray_config["port"],
+        },
     )
     processes[DASHBOARD] = _spawn_process(DASHBOARD, args)
     _update_icon()
@@ -126,6 +138,23 @@ def _stop_process(name):
         pass
     finally:
         logger.info("Process stopped", extra={"component": name})
+        _update_icon()
+
+
+def _watch_process_exit(name, proc):
+    try:
+        returncode = proc.wait()
+    except Exception as exc:
+        logger.exception(
+            "Process watcher failed", extra={"component": name, "error": str(exc)}
+        )
+        return
+    logger.info(
+        "Process exited",
+        extra={"component": name, "returncode": returncode},
+    )
+    if processes.get(name) is proc:
+        processes.pop(name, None)
         _update_icon()
 
 
