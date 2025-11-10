@@ -1,6 +1,6 @@
 [package]
 name = "core_native"
-version = "0.1.0"
+version = "0.1.4"
 edition = "2021"
 build = "build.rs"
 
@@ -30,6 +30,12 @@ serde_json = "1.0.145"
 base64 = "0.22.1"
 object = { version = "0.36", features = ["write"] }
 libc = "0.2"
+spki = { version = "0.7", features = ["pem"] }
+pem-rfc7468 = { version = "1.0.0", features = ["alloc"] }
+
+
+[dev-dependencies]
+elliptic-curve = { version = "0.13", features = ["pem"] }
 
 [target."cfg(windows)".dependencies]
 winreg = "0.55"

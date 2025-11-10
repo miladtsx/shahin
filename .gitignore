@@ -27,3 +27,8 @@ logs/app.jsonl
 frontend/build
 frontend/app.spec
 logs/
+.keys
+target
+build
+dist
+res/dataset/newplates

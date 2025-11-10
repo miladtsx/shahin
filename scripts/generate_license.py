@@ -16,25 +16,13 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List
 
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_KEY_PATH = REPO_ROOT / ".keys" / "licensing_private.pem"
+DEFAULT_KEY_PATH = REPO_ROOT / "core_native/.keys" / "licensing_private_pkcs8.pem"
 
 
 def _canonical_json(data: dict) -> str:
     return json.dumps(data, separators=(",", ":"), sort_keys=True)
 
-
-def _load_private_key(path: Path):
-    try:
-        blob = path.read_bytes()
-        return serialization.load_pem_private_key(blob, password=None)
-    except FileNotFoundError as exc:  # pragma: no cover - tool script
-        raise SystemExit(f"Private key not found at {path}") from exc
-    except Exception as exc:  # pragma: no cover - tool script
-        raise SystemExit(f"Failed to load private key {path}: {exc}")
 
 
 def _build_payload(
@@ -56,6 +44,20 @@ def _build_payload(
     return payload
 
 
+def _sign_with_rust(payload_json: str, key_path: Path) -> str:
+    try:
+        import core_native  # pylint: disable=import-error
+    except ImportError as exc:  # pragma: no cover - requires built extension
+        raise SystemExit(
+            "core_native extension not found. Build the Rust module before generating licenses."
+        ) from exc
+
+    try:
+        return core_native.sign_license_payload(payload_json, str(key_path))
+    except Exception as exc:  # pragma: no cover - tool script
+        raise SystemExit(f"Rust signing failed: {exc}") from exc
+
+
 def generate_license_blob(
     fingerprint: str,
     customer: str,
@@ -67,14 +69,10 @@ def generate_license_blob(
     features = [f.strip() for f in (features_raw or "").split(",") if f.strip()]
     if not features:
         raise ValueError("At least one feature must be provided.")
-    private_key = _load_private_key(key_path)
     payload = _build_payload(fingerprint, customer, features, expiry, license_id)
     payload_json = _canonical_json(payload)
-    signature = private_key.sign(
-        payload_json.encode("utf-8"), ec.ECDSA(hashes.SHA256())
-    )
+    signature_b64 = _sign_with_rust(payload_json, key_path)
     payload_b64 = base64.b64encode(payload_json.encode("utf-8")).decode("ascii")
-    signature_b64 = base64.b64encode(signature).decode("ascii")
     return f"{payload_b64}.{signature_b64}"
 
 
