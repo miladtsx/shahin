@@ -73,6 +73,103 @@ main {
   overflow: hidden;
 }
 
+.license-card {
+  border: 1px solid #ecf0f1;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #fff;
+}
+
+.license-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.license-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.4em;
+  color: #2c3e50;
+}
+
+.license-card h5 {
+  margin: 0 0 4px;
+  font-size: 1.1em;
+  color: #34495e;
+}
+
+.license-card p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.95em;
+}
+
+.license-status-badge {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: #eceff1;
+  color: #607d8b;
+  min-width: 90px;
+  text-align: center;
+}
+
+.license-status-badge.valid {
+  background: rgba(46, 204, 113, 0.18);
+  color: #1e8449;
+}
+
+.license-status-badge.invalid {
+  background: rgba(231, 76, 60, 0.18);
+  color: #c0392b;
+}
+
+.license-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.license-field {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.license-label {
+  font-size: 0.85em;
+  color: #7f8c8d;
+}
+
+.license-value {
+  font-size: 1em;
+  color: #2c3e50;
+  word-break: break-all;
+}
+
+.license-meta {
+  display: none;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.license-meta .license-field {
+  background: #fff7e6;
+}
+
+.license-hint {
+  font-size: 0.85em;
+  color: #95a5a6;
+  margin: 0;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -511,7 +608,7 @@ main {
   line-height: 1.5;
 }
 
-#platesTable tbody td + td {
+#platesTable tbody td+td {
   border-right: 1px solid #eef1f6;
 }
 
@@ -1576,7 +1673,8 @@ td img:hover {
 /* Active tab and panel states */
 #settings-tab-camera:checked~.settings-nav label[for="settings-tab-camera"],
 #settings-tab-detection:checked~.settings-nav label[for="settings-tab-detection"],
-#settings-tab-restrictions:checked~.settings-nav label[for="settings-tab-restrictions"] {
+#settings-tab-restrictions:checked~.settings-nav label[for="settings-tab-restrictions"],
+#settings-tab-license:checked~.settings-nav label[for="settings-tab-license"] {
   background: linear-gradient(135deg, rgba(76, 110, 245, 0.16), rgba(76, 110, 245, 0.05));
   border-color: rgba(76, 110, 245, 0.25);
   box-shadow: 0 14px 30px rgba(76, 110, 245, 0.2);
@@ -1585,7 +1683,8 @@ td img:hover {
 
 #settings-tab-camera:checked~.settings-main .settings-panel[data-tab="settings-tab-camera"],
 #settings-tab-detection:checked~.settings-main .settings-panel[data-tab="settings-tab-detection"],
-#settings-tab-restrictions:checked~.settings-main .settings-panel[data-tab="settings-tab-restrictions"] {
+#settings-tab-restrictions:checked~.settings-main .settings-panel[data-tab="settings-tab-restrictions"],
+#settings-tab-license:checked~.settings-main .settings-panel[data-tab="settings-tab-license"] {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
@@ -1594,7 +1693,8 @@ td img:hover {
 
 #settings-tab-camera:checked~.settings-nav label[for="settings-tab-camera"] .nav-caption,
 #settings-tab-detection:checked~.settings-nav label[for="settings-tab-detection"] .nav-caption,
-#settings-tab-restrictions:checked~.settings-nav label[for="settings-tab-restrictions"] .nav-caption {
+#settings-tab-restrictions:checked~.settings-nav label[for="settings-tab-restrictions"] .nav-caption,
+#settings-tab-license:checked~.settings-nav label[for="settings-tab-license"] .nav-caption {
   color: #31425b;
 }
 
@@ -1645,7 +1745,8 @@ td img:hover {
 
   #settings-tab-camera:checked~.settings-main .settings-panel[data-tab="settings-tab-camera"],
   #settings-tab-detection:checked~.settings-main .settings-panel[data-tab="settings-tab-detection"],
-  #settings-tab-restrictions:checked~.settings-main .settings-panel[data-tab="settings-tab-restrictions"] {
+  #settings-tab-restrictions:checked~.settings-main .settings-panel[data-tab="settings-tab-restrictions"],
+  #settings-tab-license:checked~.settings-main .settings-panel[data-tab="settings-tab-license"] {
     display: block;
   }
 
@@ -1744,6 +1845,7 @@ footer a:hover {
   font-weight: normal;
   font-style: normal;
 }
+
 #imgDetailsModal .modal-image-stack {
   display: flex;
   flex-direction: column;

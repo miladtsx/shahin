@@ -434,6 +434,20 @@ def backend_status():
     return jsonify({"status": "غیرفعال"})
 
 
+@app.route("/license", methods=["GET"])
+def license_info():
+    """Expose current license status for the dashboard."""
+    status = license_utils.license_status()
+    summary = license_utils.current_license_summary() or {}
+    return jsonify(
+        {
+            "valid": status.valid,
+            "reason": status.reason,
+            "summary": summary,
+        }
+    )
+
+
 def ensure_database():
     db_path = get_db_path()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -478,9 +492,7 @@ def ensure_database():
 def _require_valid_license():
     status = license_utils.license_status(force_reload=True)
     if not status.valid:
-        logger.critical(
-            "dashboard_license_invalid", extra={"reason": status.reason}
-        )
+        logger.critical("dashboard_license_invalid", extra={"reason": status.reason})
         raise SystemExit("License invalid or missing. Activate via the tray.")
 
 

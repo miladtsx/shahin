@@ -219,7 +219,7 @@ def _open_activation_dialog(reason=None):
             from tkinter import messagebox
 
             root = tk.Tk()
-            root.title("Shahin Activation")
+            root.title("فعال‌سازی شاهین")
             root.resizable(False, False)
             fingerprint = ""
             try:
@@ -227,7 +227,7 @@ def _open_activation_dialog(reason=None):
             except Exception as exc:  # pragma: no cover - UI helper
                 fingerprint = f"<error: {exc}>"
 
-            tk.Label(root, text="Machine fingerprint:").grid(
+            tk.Label(root, text="اثر انگشت دستگاه شما:").grid(
                 row=0, column=0, sticky="w", padx=10, pady=(10, 0)
             )
 
@@ -239,12 +239,12 @@ def _open_activation_dialog(reason=None):
             def copy_fp():
                 root.clipboard_clear()
                 root.clipboard_append(fingerprint)
-                messagebox.showinfo("Copied", "Fingerprint copied to clipboard.")
+                messagebox.showinfo("کپی شد", "اثر انگشت کپی شد")
 
-            copy_btn = tk.Button(root, text="Copy fingerprint", command=copy_fp)
+            copy_btn = tk.Button(root, text="کپی اثر انگشت", command=copy_fp)
             copy_btn.grid(row=1, column=2, padx=5, pady=5)
 
-            tk.Label(root, text="Paste the signed license key below:").grid(
+            tk.Label(root, text="کلید اهراز هویت را در زیر وارد نمایید").grid(
                 row=2, column=0, columnspan=3, sticky="w", padx=10, pady=(10, 0)
             )
 
@@ -252,29 +252,31 @@ def _open_activation_dialog(reason=None):
             license_input.grid(row=3, column=0, columnspan=3, padx=10, pady=5)
 
             if reason:
-                tk.Label(
-                    root, text=f"Last error: {reason}", fg="red", anchor="w"
-                ).grid(row=4, column=0, columnspan=3, sticky="w", padx=10)
+                tk.Label(root, text=f"آخرین خطا: {reason}", fg="red", anchor="w").grid(
+                    row=4, column=0, columnspan=3, sticky="w", padx=10
+                )
 
             def on_validate():
                 blob = license_input.get("1.0", "end").strip()
                 if not blob:
-                    messagebox.showwarning("Missing input", "Please paste the license key.")
+                    messagebox.showwarning(
+                        "ورودی ناموجود", "لطفاً کلید اهراز هویت را وارد نمایید"
+                    )
                     return
                 status = license_utils.activate_license(blob)
                 if status.valid:
-                    messagebox.showinfo("Activation successful", "License stored successfully.")
+                    messagebox.showinfo("فعال‌سازی موفق", "فرایند اهراز هویت با موفقیت انجام شد")
                     root.destroy()
                 else:
                     messagebox.showerror(
-                        "Activation failed",
-                        f"License rejected ({status.reason}). Please verify and try again.",
+                        "فعال‌سازی ناموفق",
+                        f"کلید نامعتبر ({status.reason}). لطفاً بررسی کرده و دوباره تلاش کنید",
                     )
 
-            action_btn = tk.Button(root, text="Validate", command=on_validate)
+            action_btn = tk.Button(root, text="تأیید", command=on_validate)
             action_btn.grid(row=5, column=0, padx=10, pady=(5, 10), sticky="w")
 
-            tk.Button(root, text="Close", command=root.destroy).grid(
+            tk.Button(root, text="بستن", command=root.destroy).grid(
                 row=5, column=2, padx=10, pady=(5, 10), sticky="e"
             )
 
@@ -299,16 +301,28 @@ def tray_main(args):
         "debug": args.debug,
         "url": args.dashboard_url or f"http://{args.host}:{args.port}",
     }
+    shah_in_controls = MenuItem(
+        "شاهین",
+        Menu(
+            MenuItem("شروع", lambda _: start_backend()),
+            MenuItem("توقف", lambda _: stop_backend()),
+        ),
+    )
+    dashboard_controls = MenuItem(
+        "مدیریت",
+        Menu(
+            MenuItem("شروع", lambda _: start_dashboard()),
+            MenuItem("توقف", lambda _: stop_dashboard()),
+        ),
+    )
     menu = Menu(
-        MenuItem("Start backend", lambda _: start_backend()),
-        MenuItem("Stop backend", lambda _: stop_backend()),
-        MenuItem("Start dashboard", lambda _: start_dashboard()),
-        MenuItem("Stop dashboard", lambda _: stop_dashboard()),
-        MenuItem("Activate…", lambda _: _open_activation_dialog()),
-        MenuItem("Quit", stop_all),
+        shah_in_controls,
+        dashboard_controls,
+        MenuItem("فعال‌سازی", lambda _: _open_activation_dialog()),
+        MenuItem("خروج", stop_all),
     )
 
-    icon = Icon("ShahinApp", _create_image(), "Shahin", menu)
+    icon = Icon("ShahinApp", _create_image(), "شاهین", menu)
 
     if not args.no_autostart:
         if license_utils.license_is_valid():

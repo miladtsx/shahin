@@ -8,6 +8,148 @@ let RESTRICTED_FILTER_ACTIVE = false;
 let UNDETECTED_FILTER_ACTIVE = false;
 let advancedSettingsInitialized = false;
 
+// Licensing metadata helpers
+const LICENSE_REASON_MESSAGES = {
+  license_valid: "مجوز تایید شد",
+  missing_license: "فایل مجوز یافت نشد",
+  fingerprint_mismatch: "شناسه دستگاه همخوان نیست",
+  invalid_expiry_format: "قالب تاریخ انقضا معتبر نیست",
+  license_expired: "مجوز منقضی شده است",
+  native_guard_blocked: "دسترسی به ماژول بومی محدود شده است",
+  signature_invalid: "امضای دیجیتال معتبر نیست",
+  write_failed: "امکان ذخیره‌سازی مجوز وجود ندارد",
+};
+
+const LICENSE_LABELS = {
+  fingerprint: "شناسه دستگاه",
+  exp: "تاریخ انقضا",
+  plan: "طرح",
+  tier: "سطح دسترسی",
+  issued_to: "صادر شده برای",
+  customer: "مشتری",
+  seats: "تعداد مجوز",
+  region: "منطقه",
+  hwid: "HWID",
+};
+
+const LICENSE_PRIMARY_FIELDS = new Set(["fingerprint", "exp", "plan", "tier"]);
+
+async function fetchLicenseInfo() {
+  const statusBadge = document.getElementById("licenseStatusBadge");
+  if (!statusBadge) return;
+  try {
+    const response = await fetch("/license");
+    if (!response.ok) throw new Error("license_http_error");
+    const payload = await response.json();
+    renderLicenseInfo(payload);
+  } catch (error) {
+    console.error("Failed to load license info", error);
+    renderLicenseError();
+  }
+}
+
+function renderLicenseInfo(payload) {
+  const badge = document.getElementById("licenseStatusBadge");
+  if (!badge) return;
+  const statusText = document.getElementById("licenseStatusText");
+  const reasonEl = document.getElementById("licenseReason");
+  const fingerprintEl = document.getElementById("licenseFingerprint");
+  const expiryEl = document.getElementById("licenseExpiry");
+  const planEl = document.getElementById("licensePlan");
+  const metaContainer = document.getElementById("licenseAdditionalMeta");
+
+  const valid = payload?.valid;
+  const reasonKey = payload?.reason;
+  const summary = payload?.summary || {};
+
+  badge.textContent = valid ? "فعال" : "غیرفعال";
+  badge.classList.toggle("valid", Boolean(valid));
+  badge.classList.toggle("invalid", !valid);
+  if (statusText) {
+    statusText.textContent = valid ? "مجوز فعال است" : "مجوز در دسترس نیست";
+  }
+  if (reasonEl) {
+    reasonEl.textContent =
+      LICENSE_REASON_MESSAGES[reasonKey] || reasonKey || "—";
+  }
+  if (fingerprintEl) {
+    fingerprintEl.textContent = summary?.fingerprint || "—";
+  }
+  if (expiryEl) {
+    expiryEl.textContent = formatLicenseDate(summary?.exp);
+  }
+  if (planEl) {
+    planEl.textContent = summary?.plan || summary?.tier || "—";
+  }
+  renderLicenseMeta(summary, metaContainer);
+}
+
+function renderLicenseMeta(summary, container) {
+  if (!container) return;
+  container.innerHTML = "";
+  if (!summary || typeof summary !== "object") {
+    container.style.display = "none";
+    return;
+  }
+  const entries = Object.entries(summary).filter(
+    ([key]) => !LICENSE_PRIMARY_FIELDS.has(key)
+  );
+  if (entries.length === 0) {
+    container.style.display = "none";
+    return;
+  }
+  container.style.display = "grid";
+  entries.forEach(([key, value]) => {
+    const field = document.createElement("div");
+    field.className = "license-field";
+
+    const label = document.createElement("span");
+    label.className = "license-label";
+    label.textContent = LICENSE_LABELS[key] || key;
+
+    const valEl = document.createElement("span");
+    valEl.className = "license-value";
+    valEl.textContent = formatLicenseValue(key, value);
+
+    field.appendChild(label);
+    field.appendChild(valEl);
+    container.appendChild(field);
+  });
+}
+
+function renderLicenseError() {
+  const badge = document.getElementById("licenseStatusBadge");
+  const statusText = document.getElementById("licenseStatusText");
+  const reasonEl = document.getElementById("licenseReason");
+  if (badge) {
+    badge.textContent = "نامشخص";
+    badge.classList.remove("valid");
+    badge.classList.add("invalid");
+  }
+  if (statusText) statusText.textContent = "عدم دسترسی به سرویس مجوز";
+  if (reasonEl) reasonEl.textContent = "لطفاً وضعیت سرویس را بررسی کنید";
+}
+
+function formatLicenseDate(value) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const formatted = parsed.toLocaleString("fa-IR", {
+    timeZone: "Asia/Tehran",
+    hour12: false,
+  });
+  return toFarsiNumber(formatted);
+}
+
+function formatLicenseValue(key, value) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (key === "exp" || key.endsWith("_at")) return formatLicenseDate(value);
+  if (typeof value === "number") return toFarsiNumber(value);
+  return String(value);
+}
+
+window.addEventListener("DOMContentLoaded", fetchLicenseInfo);
+
 // CRUD
 async function fetchTraffic(query = "") {
   const qs = query
@@ -142,25 +284,37 @@ function openPlateImageModal(src, plateData) {
       <div class="modal-details-grid">
         <label class="modal-field">
           <span>نوع خودرو</span>
-          <input class="modal-input" id="editCarType" value="${plateData.car_type || ""}">
+          <input class="modal-input" id="editCarType" value="${
+            plateData.car_type || ""
+          }">
         </label>
         <label class="modal-field">
           <span>رنگ خودرو</span>
-          <input class="modal-input" id="editCarColor" value="${plateData.car_color || ""}">
+          <input class="modal-input" id="editCarColor" value="${
+            plateData.car_color || ""
+          }">
         </label>
         <label class="modal-field">
           <span>صاحب خودرو</span>
-          <input class="modal-input" id="editCarOwner" value="${plateData.car_owner || ""}">
+          <input class="modal-input" id="editCarOwner" value="${
+            plateData.car_owner || ""
+          }">
         </label>
         <label class="modal-field">
           <span>موقعیت دوربین</span>
-          <input class="modal-input" id="editCameraLocation" value="${plateData.camera_location || ""}" dir="ltr">
+          <input class="modal-input" id="editCameraLocation" value="${
+            plateData.camera_location || ""
+          }" dir="ltr">
         </label>
       </div>
     </div>
     <div class="modal-actions modal-actions--details">
-      <button class="button green-btn" onclick="confirmUpdatePlate('${plateData.uuid}')">بروزرسانی</button>
-      <button class="button red-btn" onclick="confirmDeletePlate('${plateData.uuid}')">حذف</button>
+      <button class="button green-btn" onclick="confirmUpdatePlate('${
+        plateData.uuid
+      }')">بروزرسانی</button>
+      <button class="button red-btn" onclick="confirmDeletePlate('${
+        plateData.uuid
+      }')">حذف</button>
     </div>
   `;
 
@@ -476,7 +630,11 @@ function normalizePlateText(value) {
     .trim();
 }
 
-function initializePlateEditor(wrapperId, plateText, hiddenInputId = "editPlateText") {
+function initializePlateEditor(
+  wrapperId,
+  plateText,
+  hiddenInputId = "editPlateText"
+) {
   const wrapper = document.getElementById(wrapperId);
   const hiddenInput = document.getElementById(hiddenInputId);
   if (!wrapper || !hiddenInput) return;
@@ -644,7 +802,11 @@ function createSegmentInput(initialValue, maxLength, isNumeric, extraClass) {
 }
 
 function sanitizeSegmentInput(input, maxLength, isNumeric) {
-  const sanitized = sanitizeSegmentValue(input.value || "", maxLength, isNumeric);
+  const sanitized = sanitizeSegmentValue(
+    input.value || "",
+    maxLength,
+    isNumeric
+  );
   input.value = sanitized;
   return sanitized;
 }
@@ -852,9 +1014,7 @@ function updateRestrictedStatusDisplay() {
 }
 
 function setRestrictedFilterState(isActive) {
-  const canActivate = Boolean(
-    RESTRICTED_HOURS.start && RESTRICTED_HOURS.end
-  );
+  const canActivate = Boolean(RESTRICTED_HOURS.start && RESTRICTED_HOURS.end);
   const nextState = Boolean(isActive) && canActivate;
   RESTRICTED_FILTER_ACTIVE = nextState;
 
@@ -914,11 +1074,7 @@ function toggleUndetectedFilter() {
   const newState = !UNDETECTED_FILTER_ACTIVE;
   setUndetectedFilterState(newState);
   fetchTraffic();
-  showToast(
-    newState
-      ? "شناسایی نشده ها"
-      : "فیلتر خاموش شد"
-  );
+  showToast(newState ? "شناسایی نشده ها" : "فیلتر خاموش شد");
 }
 
 // export CSV using current filters
@@ -1053,7 +1209,10 @@ async function saveSettings() {
   const restrictedStart = restrictedStartInput?.value || "";
   const restrictedEnd = restrictedEndInput?.value || "";
 
-  if ((restrictedStart && !restrictedEnd) || (!restrictedStart && restrictedEnd)) {
+  if (
+    (restrictedStart && !restrictedEnd) ||
+    (!restrictedStart && restrictedEnd)
+  ) {
     showToast("برای فعالسازی، هر دو ساعت را وارد کنید");
     return;
   }
@@ -1202,7 +1361,11 @@ const Rotation = (() => {
   };
 
   const getPersistedAngle = () =>
-    clamp(document.getElementById("rotation_angle")?.value || config.rotation_angle || 0);
+    clamp(
+      document.getElementById("rotation_angle")?.value ||
+        config.rotation_angle ||
+        0
+    );
 
   const setPreviewSource = () => {
     if (!previewImage) return;

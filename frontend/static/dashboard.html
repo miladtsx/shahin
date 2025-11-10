@@ -303,6 +303,12 @@
             id="settings-tab-restrictions"
             class="settings-tab-radio"
           />
+          <input
+            type="radio"
+            name="settings-tab"
+            id="settings-tab-license"
+            class="settings-tab-radio"
+          />
 
           <aside class="settings-nav">
             <label class="settings-nav-item" for="settings-tab-camera">
@@ -316,6 +322,10 @@
             <label class="settings-nav-item" for="settings-tab-restrictions">
               <span class="nav-title">محدودیت‌ها</span>
               <span class="nav-caption">ساعات مدیریت شده</span>
+            </label>
+            <label class="settings-nav-item" for="settings-tab-license">
+              <span class="nav-title">لایسنس</span>
+              <span class="nav-caption">وضعیت و جزئیات</span>
             </label>
           </aside>
 
@@ -507,6 +517,63 @@
                       >ترددهای داخل این بازه در داشبورد با هشدار مشخص
                       می‌شوند.</span
                     >
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-panel" data-tab="settings-tab-license">
+                <div class="panel-header">
+                  <h4>لایسنس</h4>
+                  <p>
+                    این اطلاعات به صورت خودکار از فایل نصب شده خوانده می‌شود و
+                    صرفاً برای بررسی وضعیت فعلی است.
+                  </p>
+                </div>
+                <div class="panel-body">
+                  <div class="license-card">
+                    <div class="license-card-header">
+                      <div>
+                        <h5>وضعیت فعال‌سازی</h5>
+                        <p>در صورت نیاز به تغییر، از برنامه تری اقدام کنید.</p>
+                      </div>
+                      <span id="licenseStatusBadge" class="license-status-badge"
+                        >—</span
+                      >
+                    </div>
+                    <div class="license-grid">
+                      <div class="license-field">
+                        <span class="license-label">وضعیت</span>
+                        <span class="license-value" id="licenseStatusText"
+                          >در حال بارگذاری...</span
+                        >
+                      </div>
+                      <div class="license-field">
+                        <span class="license-label">دلیل</span>
+                        <span class="license-value" id="licenseReason">—</span>
+                      </div>
+                      <div class="license-field">
+                        <span class="license-label">اثرانگشت دستگاه</span>
+                        <code
+                          class="license-value"
+                          id="licenseFingerprint"
+                          dir="ltr"
+                          >—</code
+                        >
+                      </div>
+                      <div class="license-field">
+                        <span class="license-label">تاریخ انقضا</span>
+                        <span class="license-value" id="licenseExpiry">—</span>
+                      </div>
+                      <div class="license-field">
+                        <span class="license-label">طرح</span>
+                        <span class="license-value" id="licensePlan">—</span>
+                      </div>
+                    </div>
+                    <div class="license-meta" id="licenseAdditionalMeta"></div>
+                    <p class="license-hint">
+                      برای بروزرسانی یا تعویض فایل مجوز از منوی سیستم (Tray
+                      Area) استفاده کنید؛ مقادیر اینجا فقط خواندنی هستند.
+                    </p>
                   </div>
                 </div>
               </section>
