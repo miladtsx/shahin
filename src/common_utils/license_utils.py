@@ -12,6 +12,8 @@ from typing import Optional
 from src.common_utils.app_logger import get_logger
 from src.common_utils import native_guard
 
+from .resource_path import get_data_path
+
 try:
     import core_native  # type: ignore
 except Exception as exc:  # pragma: no cover - tray/backends require native module anyway
@@ -19,9 +21,7 @@ except Exception as exc:  # pragma: no cover - tray/backends require native modu
 
 logger = get_logger("licensing")
 
-LICENSE_DIR = Path(os.environ.get("SHAHIN_LICENSE_DIR") or Path.home() / ".shahin")
-LICENSE_PATH = LICENSE_DIR / "license.json"
-
+LICENSE_PATH = Path(get_data_path(f"license/"))
 
 @dataclass
 class LicenseStatus:
@@ -122,7 +122,7 @@ def _read_license_from_disk() -> Optional[str]:
     if not LICENSE_PATH.exists():
         return None
     try:
-        with open(LICENSE_PATH, "r", encoding="utf-8") as fh:
+        with open(LICENSE_PATH / "license.json", "r", encoding="utf-8") as fh:
             raw = fh.read().strip()
             if not raw:
                 return None
@@ -149,9 +149,9 @@ def _read_license_from_disk() -> Optional[str]:
 
 
 def _write_license_to_disk(blob: str) -> None:
-    LICENSE_DIR.mkdir(parents=True, exist_ok=True)
+    LICENSE_PATH.mkdir(parents=True, exist_ok=True)
     data = {"license": _normalize_blob(blob)}
-    with open(LICENSE_PATH, "w", encoding="utf-8") as fh:
+    with open(LICENSE_PATH / "license.json", "w", encoding="utf-8") as fh:
         json.dump(data, fh, separators=(",", ":"))
 
 
