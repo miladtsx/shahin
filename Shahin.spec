@@ -11,6 +11,7 @@ if REPO_ROOT not in sys.path:
 
 ENTRY_STUB = os.path.join(REPO_ROOT, "scripts", "pyinstaller_stub.py")
 CRITICAL_MODULES = [
+    "main",
     "tray_app",
     "src.common_utils.app_logger",
     "src.common_utils.resource_path",
@@ -23,7 +24,6 @@ hiddenimports = [
 ]
 hiddenimports += [
     "src.common_utils.image_save",
-    "main",
     "frontend.app",
 ]
 hiddenimports += collect_submodules("pystray")

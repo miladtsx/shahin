@@ -14,10 +14,16 @@ pub struct ProtectedAssetSpec {
 
 pub const PROTECTED_MODULES: &[ProtectedModuleSpec] = &[
     ProtectedModuleSpec {
+        import_name: "main",
+        plaintext_path: "main.py",
+        encrypted_name: "main.bin",
+        expected_sha256: "6fe2a3035a89a783c480a2eed7dddc7eeb0638bfb2a1756217518c16bd03d96c",
+    },
+    ProtectedModuleSpec {
         import_name: "tray_app",
         plaintext_path: "tray_app.py",
         encrypted_name: "tray_app.bin",
-        expected_sha256: "ee9cd2a4a07539d883be5faaefddc2995e0e288c39773a7c4887d44152dd88a6",
+        expected_sha256: "2295f6699f18f696e3cd385835a618797bc4174bc7a22e556e906300ef8bd206",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.app_logger",

@@ -362,8 +362,14 @@ def tray_main(args: Mapping[str, Any]):
 
 
 def backend_main(_args: Mapping[str, Any]):
-    from main import main as run_backend
-
+    try:
+        from main import main as run_backend
+    except Exception as exc:  # pragma: no cover - backend import should succeed
+        logger.exception(
+            "backend_entry_import_failed",
+            extra={"error": str(exc)},
+        )
+        sys.exit(4)
     logger.info("Launching backend mode")
     run_backend()
 
