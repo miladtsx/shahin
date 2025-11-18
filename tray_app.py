@@ -5,7 +5,7 @@ import sys
 import webbrowser
 from pathlib import Path
 import threading
-from typing import Any, Mapping, MutableMapping, Optional
+from typing import Any, Dict, Mapping, Optional
 
 from pystray import Icon, Menu, MenuItem
 from PIL import Image, ImageDraw
@@ -34,8 +34,8 @@ tray_config = {
 logger = get_logger("tray.app")
 
 
-def _normalize_args(raw: Optional[Mapping[str, Any]]) -> dict[str, Any]:
-    base: dict[str, Any] = {
+def _normalize_args(raw: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    base: Dict[str, Any] = {
         "mode": "tray",
         "host": "127.0.0.1",
         "port": 5000,

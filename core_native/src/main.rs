@@ -133,18 +133,31 @@ fn beacon_tick(exe_path: &Path, expected_hash: &str) -> Result<()> {
     Python::with_gil(|py| -> Result<()> {
         let license_module = py.import_bound("src.common_utils.license_utils")?;
         let status = license_module.call_method1("license_status", (true,))?;
-        let valid = status.getattr("valid")?.extract::<bool>()?;
-        if !valid {
-            let reason = status
-                .getattr("reason")?
-                .extract::<String>()
-                .unwrap_or_else(|_| "unknown".to_string());
-            bail!("license invalid at runtime ({reason})");
-        }
+        enforce_license(&status).map_err(|err| anyhow!(err.to_string()))?;
         Ok(())
     })?;
 
     Ok(())
+}
+
+fn enforce_license(status: &Bound<'_, PyAny>) -> PyResult<()> {
+    let valid = status.getattr("valid")?.extract::<bool>()?;
+    if valid {
+        return Ok(());
+    }
+
+    let reason = status
+        .getattr("reason")?
+        .extract::<String>()
+        .unwrap_or_else(|_| "unknown".to_string());
+    if reason == "missing_license" {
+        eprintln!("[launcher] no license installed; continuing to activation flow");
+        return Ok(());
+    }
+
+    Err(PyErr::new::<pyo3::exceptions::PyPermissionError, _>(
+        format!("license invalid: {reason}"),
+    ))
 }
 
 fn constant_time_hex_eq(lhs: &str, rhs: &str) -> bool {
@@ -310,6 +323,7 @@ fn bootstrap_python(
     install_memory_importer(py, modules)?;
 
     let sys = py.import_bound("sys")?;
+    inherit_bundle_sys_path(py, &sys)?;
     let argv = PyList::new_bound(py, args.argv(exe_path));
     sys.setattr("argv", &argv)?;
     sys.setattr("executable", exe_path.to_string_lossy().as_ref())?;
@@ -326,18 +340,11 @@ fn bootstrap_python(
 
     let license_module = py.import_bound("src.common_utils.license_utils")?;
     let status = license_module.call_method1("license_status", (true,))?;
-    let valid = status.getattr("valid")?.extract::<bool>()?;
-    if !valid {
-        let reason = status
-            .getattr("reason")?
-            .extract::<String>()
-            .unwrap_or_else(|_| "unknown".to_string());
-        return Err(PyErr::new::<pyo3::exceptions::PyPermissionError, _>(
-            format!("license invalid: {reason}"),
-        ));
-    }
+    enforce_license(&status)?;
 
     let tray_app = py.import_bound("tray_app")?;
+    eprintln!("3");
+
     let args_dict = args.to_pydict(py)?;
     eprintln!(
         "[launcher] invoking tray_app.main (mode={}, host={}, port={})",
@@ -360,6 +367,24 @@ fn install_memory_importer<'py>(
         payloads.set_item(name, source)?;
     }
     install.call1((payloads.as_any(),))?;
+    Ok(())
+}
+
+fn inherit_bundle_sys_path(py: Python<'_>, sys: &Bound<'_, PyModule>) -> PyResult<()> {
+    let Ok(raw) = env::var("SHAHIN_BUNDLE_SYSPATH") else {
+        return Ok(());
+    };
+    if raw.trim().is_empty() {
+        return Ok(());
+    }
+    let sys_path = sys.getattr("path")?.downcast_into::<PyList>()?;
+    for path in env::split_paths(&raw) {
+        if path.as_os_str().is_empty() {
+            continue;
+        }
+        let value = path.to_string_lossy();
+        sys_path.insert(0, value.as_ref())?;
+    }
     Ok(())
 }
 

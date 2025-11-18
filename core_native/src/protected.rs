@@ -17,7 +17,7 @@ pub const PROTECTED_MODULES: &[ProtectedModuleSpec] = &[
         import_name: "tray_app",
         plaintext_path: "tray_app.py",
         encrypted_name: "tray_app.bin",
-        expected_sha256: "281d931da805fdb75218224c246e0ab4f8ee1eea1d4a38ba4d20ba459e77c78a",
+        expected_sha256: "ee9cd2a4a07539d883be5faaefddc2995e0e288c39773a7c4887d44152dd88a6",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.app_logger",
@@ -29,7 +29,7 @@ pub const PROTECTED_MODULES: &[ProtectedModuleSpec] = &[
         import_name: "src.common_utils.resource_path",
         plaintext_path: "src/common_utils/resource_path.py",
         encrypted_name: "resource_path.bin",
-        expected_sha256: "6bb8467de308c973d8d5d6b8b58b0550ec830972144304fd2a65cb89c318c8bb",
+        expected_sha256: "cc1addf79662c974ddf47cac1549762222462141b62322544fb373eb057bdc8f",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.license_utils",

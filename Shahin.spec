@@ -23,11 +23,10 @@ hiddenimports = [
 ]
 hiddenimports += [
     "src.common_utils.image_save",
-    "pystray",
-    "pystray._win32",
-    "pystray._base",
+    "main",
     "frontend.app",
 ]
+hiddenimports += collect_submodules("pystray")
 
 launcher_name = "core_native.exe"
 LAUNCHER_PATH = os.path.join("core_native", "target", "release", launcher_name)
@@ -50,7 +49,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=CRITICAL_MODULES,
-    noarchive=False,
+    noarchive=True,
     optimize=0,
 )
 pyz = PYZ(a.pure)
