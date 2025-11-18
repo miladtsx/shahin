@@ -4,7 +4,9 @@ use object::{Object, ObjectSection};
 use pyo3::prelude::*;
 use ring::signature;
 use serde::Deserialize;
-use std::path::PathBuf;
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 #[derive(Deserialize)]
 struct IntegrityManifest {
@@ -23,6 +25,34 @@ impl IntegrityManifest {
             .or(self.text_sha256.as_deref())
             .or(self.exe_hash.as_deref())
     }
+}
+
+fn sha256_hex_from_bytes(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hex::encode(hasher.finalize())
+}
+
+pub fn sha256_of_bytes(data: &[u8]) -> String {
+    sha256_hex_from_bytes(data)
+}
+
+pub fn sha256_of_file(path: &Path) -> std::io::Result<String> {
+    let data = fs::read(path)?;
+    Ok(sha256_hex_from_bytes(&data))
+}
+
+#[pyfunction]
+pub fn calculate_bytes_sha256(data: &[u8]) -> PyResult<String> {
+    Ok(sha256_of_bytes(data))
+}
+
+#[pyfunction]
+pub fn calculate_file_sha256(path: &str) -> PyResult<String> {
+    let digest = sha256_of_file(Path::new(path)).map_err(|err| {
+        PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("read {path}: {err}"))
+    })?;
+    Ok(digest)
 }
 
 #[pyfunction]

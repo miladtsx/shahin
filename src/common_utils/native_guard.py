@@ -15,6 +15,7 @@ _thread_local = threading.local()
 
 
 def debugger_present() -> bool:
+    return False #TODO for development purposes
     tracer = sys.gettrace()
     if tracer is not None:
         return True

@@ -1,11 +1,15 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
-mod crypto;
+pub mod crypto;
 #[cfg(feature = "hardened")]
 mod hardened;
 mod hwid;
-mod integrity;
+pub mod integrity;
 mod licensing;
+#[cfg(target_os = "windows")]
+mod markers;
+pub mod protected;
+pub mod selfhash;
 
 pub(crate) static LIC_PUB_KEY_DER: &[u8] = include_bytes!("../.keys/licensing_public.der");
 #[allow(dead_code)]
@@ -104,14 +108,16 @@ fn to_lower_hex(bytes: &[u8]) -> String {
     out
 }
 
-#[pymodule]
-fn core_native(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+#[pymodule(name = "core_native")]
+pub fn core_native_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(licensing::verify_signed_blob, m)?)?;
     m.add_function(wrap_pyfunction!(licensing::sign_license_payload, m)?)?;
     m.add_function(wrap_pyfunction!(derive_hwid, m)?)?;
     m.add_function(wrap_pyfunction!(crypto::seal, m)?)?;
     m.add_function(wrap_pyfunction!(crypto::unseal, m)?)?;
     m.add_function(wrap_pyfunction!(integrity::self_check, m)?)?;
+    m.add_function(wrap_pyfunction!(integrity::calculate_file_sha256, m)?)?;
+    m.add_function(wrap_pyfunction!(integrity::calculate_bytes_sha256, m)?)?;
     m.add_function(wrap_pyfunction!(verify_file_hash, m)?)?;
     m.add_function(wrap_pyfunction!(get_machine_fingerprint, m)?)?;
     Ok(())

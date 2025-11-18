@@ -10,6 +10,29 @@ Select the sharpest, best-quality frame of each unique license plate from a 120 
 - Accuracy > speed.
 - Asynchronous-friendly pipeline.
 
+## Protective System Overview
+
+```mermaid
+flowchart TD
+    A([User launches shahin.exe]) --> B{Self-integrity check}
+    B -->|hash mismatch| Z1([Abort: tampered EXE])
+    B -->|hash ok| C{Protected payload check}
+    C -->|missing/corrupt| Z2([Abort: sealed assets invalid])
+    C -->|ok| D([Decrypt critical Python modules in memory])
+    D --> E{Verify decrypted module hashes}
+    E -->|mismatch| Z3([Abort: module integrity fail])
+    E -->|ok| F{License validation via core_native}
+    F -->|invalid| Z4([Abort: no valid license])
+    F -->|valid| G([Initialize embedded Python interpreter])
+    G --> H([Inject decrypted modules + tray_app entry])
+    H --> I([Pipeline stages: detectors → tracker → selector])
+    I --> J([Runtime logs & dashboard services])
+    style Z1 fill:#fdd
+    style Z2 fill:#fdd
+    style Z3 fill:#fdd
+    style Z4 fill:#fdd
+```
+
 ## Requirements
 
 - Python 3.10+

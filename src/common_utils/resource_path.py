@@ -1,9 +1,15 @@
 import os, sys
 from pathlib import Path
 
+_MODELS_OVERRIDE = os.environ.get("SHAHIN_MODELS_DIR")
+
 
 def get_resource_path(relative_path):
     """Return absolute path to resource inside EXE or dev environment."""
+    normalized = relative_path.replace("\\", "/")
+    if _MODELS_OVERRIDE and normalized.startswith("res/models/"):
+        return str(Path(_MODELS_OVERRIDE) / Path(relative_path).name)
+
     if getattr(sys, "frozen", False):
         # Path inside the PyInstaller bundle
         base_path = sys._MEIPASS

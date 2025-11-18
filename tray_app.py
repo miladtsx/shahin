@@ -1,4 +1,3 @@
-import argparse
 import os
 import signal
 import subprocess
@@ -6,6 +5,7 @@ import sys
 import webbrowser
 from pathlib import Path
 import threading
+from typing import Any, Mapping, MutableMapping, Optional
 
 from pystray import Icon, Menu, MenuItem
 from PIL import Image, ImageDraw
@@ -34,8 +34,38 @@ tray_config = {
 logger = get_logger("tray.app")
 
 
+def _normalize_args(raw: Optional[Mapping[str, Any]]) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "mode": "tray",
+        "host": "127.0.0.1",
+        "port": 5000,
+        "debug": False,
+        "no_autostart": False,
+        "no_browser": False,
+        "dashboard_url": None,
+    }
+    if raw is None:
+        return base
+    if not isinstance(raw, Mapping):
+        raise TypeError("tray arguments must be provided as a mapping")
+    for key, value in raw.items():
+        base[key] = value
+    base["mode"] = str(base.get("mode", "tray")).lower()
+    base["host"] = str(base.get("host", "127.0.0.1"))
+    base["port"] = int(base.get("port", 5000))
+    base["debug"] = bool(base.get("debug", False))
+    base["no_autostart"] = bool(base.get("no_autostart", False))
+    base["no_browser"] = bool(base.get("no_browser", False))
+    dashboard_url = base.get("dashboard_url")
+    base["dashboard_url"] = str(dashboard_url) if dashboard_url else None
+    return base
+
+
 def build_command(mode, extra_args=None):
     extra_args = extra_args or []
+    launcher = os.environ.get("SHAHIN_LAUNCHER")
+    if launcher:
+        return [launcher, "--mode", mode, *extra_args]
     if getattr(sys, "frozen", False):
         return [sys.executable, "--mode", mode, *extra_args]
 
@@ -195,20 +225,6 @@ def _create_image(backend_running=False, dash_running=False):
     return base
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Shahin tray controller")
-    parser.add_argument(
-        "--mode", choices=["tray", "backend", "dashboard"], default="tray"
-    )
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=5000)
-    parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--no-autostart", action="store_true")
-    parser.add_argument("--no-browser", action="store_true")
-    parser.add_argument("--dashboard-url")
-    return parser.parse_args()
-
-
 def _open_activation_dialog(reason=None):
     def _launch():
         acquired = _activation_window_open.acquire(blocking=False)
@@ -292,15 +308,24 @@ def _open_activation_dialog(reason=None):
     threading.Thread(target=_launch, name="activation-dialog", daemon=True).start()
 
 
-def tray_main(args):
+def tray_main(args: Mapping[str, Any]):
     global icon
     global tray_config
     tray_config = {
-        "host": args.host,
-        "port": args.port,
-        "debug": args.debug,
-        "url": args.dashboard_url or f"http://{args.host}:{args.port}",
+        "host": args["host"],
+        "port": args["port"],
+        "debug": args["debug"],
+        "url": args["dashboard_url"] or f"http://{args['host']}:{args['port']}",
     }
+    logger.info(
+        "Launching tray mode",
+        extra={
+            "host": tray_config["host"],
+            "port": tray_config["port"],
+            "debug": tray_config["debug"],
+            "no_autostart": args["no_autostart"],
+        },
+    )
     shah_in_controls = MenuItem(
         "شاهین",
         Menu(
@@ -324,23 +349,26 @@ def tray_main(args):
 
     icon = Icon("ShahinApp", _create_image(), "شاهین", menu)
 
-    if not args.no_autostart:
+    if not args["no_autostart"]:
         if license_utils.license_is_valid():
             start_backend()
-            start_dashboard(open_browser=not args.no_browser, url=tray_config["url"])
+            start_dashboard(
+                open_browser=not args["no_browser"], url=tray_config["url"]
+            )
         else:
             logger.warning("Skipping autostart: license missing or invalid")
 
     icon.run()
 
 
-def backend_main():
+def backend_main(_args: Mapping[str, Any]):
     from main import main as run_backend
 
+    logger.info("Launching backend mode")
     run_backend()
 
 
-def dashboard_main(host, port, debug):
+def dashboard_main(args: Mapping[str, Any]):
     from frontend.app import run_dashboard
 
     status = license_utils.license_status(force_reload=True)
@@ -350,19 +378,29 @@ def dashboard_main(host, port, debug):
             extra={"reason": status.reason},
         )
         sys.exit(3)
-    run_dashboard(host=host, port=port, debug=debug)
+    logger.info(
+        "Launching dashboard mode",
+        extra={
+            "host": args["host"],
+            "port": args["port"],
+            "debug": args["debug"],
+        },
+    )
+    run_dashboard(
+        host=args["host"],
+        port=args["port"],
+        debug=args["debug"],
+    )
 
 
-def main():
-    args = parse_args()
+def main(args: Optional[Mapping[str, Any]] = None):
+    params = _normalize_args(args)
+    mode = params["mode"]
+    logger.info("Entry dispatch", extra={"mode": mode})
 
-    if args.mode == "backend":
-        backend_main()
-    elif args.mode == "dashboard":
-        dashboard_main(args.host, args.port, args.debug)
+    if mode == "backend":
+        backend_main(params)
+    elif mode == "dashboard":
+        dashboard_main(params)
     else:
-        tray_main(args)
-
-
-if __name__ == "__main__":
-    main()
+        tray_main(params)
