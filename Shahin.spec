@@ -39,9 +39,9 @@ a = Analysis(
     [ENTRY_STUB],
     pathex=pathex,
     binaries=[LAUNCHER_BINARY],
-    datas=[
+datas=[
         ("frontend/static", "frontend/static"),
-        ("res", "res"),
+        ("res/main.py.sha256", "res/main.py.sha256"),
         PROTECTED_DATAS,
     ],
     hiddenimports=hiddenimports,
