@@ -32,9 +32,13 @@ linker flags for local debugging builds.
 `-ClientKeyHex`/`-ClientKeyFile`). When `-ClientId` is provided the build
 automatically creates or reuses a random 32-byte secret stored at
 `.keys/client-<id>.key` (this path sits at the repo root and is ignored by git).
-That key both encrypts the Python/asset payloads and gets embedded—after
-obfuscation—into the Rust launcher via `embedkey`, so nothing outside Rust ever
-sees the raw material. The `protect` helper still writes
+That base key is hashed with the client identifier to derive the actual module
+key, and the base material is split into four 8-byte fragments that land in
+misleading PE/ELF sections. Each fragment is masked via an LFSR seeded with the
+launcher hash; the Rust launcher recombines them with a small Feistel mixer
+before unmasking. Every protected module/asset also gets a per-scope tweak
+(`derive_scoped` => SHA256(base || scope)) so different payloads never share the
+same encryption key. The `protect` helper still writes
 `protected/key_manifest.json` noting whether payloads expect launcher-hash
 derivation or a client key; keeping the `.keys/client-*.key` files lets you
 repackage updates for that client later without changing their decryption key.

@@ -1,115 +1,271 @@
 use anyhow::{anyhow, Result};
-use once_cell::sync::OnceCell;
+use sha2::{Digest, Sha256};
 
-const KEY_MARKER_START: &[u8] = b"__S_C_K_BEGIN__";
-const KEY_MARKER_END: &[u8] = b"__S_C_K_END__";
-const KEY_PLACEHOLDER_HEX: &str = "0000000000000000000000000000000000000000000000000000000000000000";
-const OBFUSCATION_MASK: [u8; 32] = [
-    0x4a, 0x9f, 0x33, 0xb1, 0x07, 0xd5, 0x5c, 0x2e, 0x61, 0x9c, 0x86, 0xda, 0x1b, 0x42, 0xfe, 0x20,
-    0xaf, 0x5e, 0x17, 0xca, 0x94, 0x01, 0x7d, 0xe2, 0x38, 0xbd, 0x6c, 0x0a, 0x53, 0xf4, 0x8b, 0x79,
+const SHARD_LEN: usize = 8;
+const SHARD_COUNT: usize = 4;
+const PLACEHOLDER_BYTE: u8 = 0x5B;
+const START_LEN: usize = 12;
+const END_LEN: usize = 9;
+const ROUND_KEYS: [u64; 8] = [
+    0xA93D_4F20_5E8C_B1D3,
+    0x6C71_D2F4_981B_0725,
+    0xF5A0_1462_C3DE_9871,
+    0x0BD4_9C37_A15F_E208,
+    0xCB9E_3779_B185_CA87,
+    0x1F73_A4D2_C6B9_3085,
+    0xD42C_17A0_E98B_2F63,
+    0x3190_D8F4_B7CA_E521,
 ];
-static EMBEDDED_KEY: OnceCell<Option<[u8; 32]>> = OnceCell::new();
 
-#[cfg_attr(not(target_os = "windows"), link_section = ".rodata.client_key")]
-#[used]
-static CLIENT_KEY_SENTINEL: &str =
-    "__S_C_K_BEGIN__0000000000000000000000000000000000000000000000000000000000000000__S_C_K_END__";
-
-pub fn embedded_key_bytes() -> Result<Option<[u8; 32]>> {
-    EMBEDDED_KEY.get_or_try_init(|| load_embedded_key()).map(|opt| *opt)
+macro_rules! shard_bytes {
+    ($($name:ident($section_win:literal, $section_unix:literal) = [$($byte:expr),+ $(,)?];)+) => {
+        $(
+            #[cfg_attr(target_os = "windows", link_section = $section_win)]
+            #[cfg_attr(not(target_os = "windows"), link_section = $section_unix)]
+            #[used]
+            static $name: [u8; shard_total_len()] = [
+                $($byte),+,
+            ];
+        )+
+    };
 }
 
-pub fn obfuscate_key(key_bytes: &[u8; 32]) -> [u8; 32] {
-    xor_with_mask(key_bytes)
+const fn shard_total_len() -> usize {
+    START_LEN + SHARD_LEN + END_LEN
 }
 
-pub fn deobfuscate_key(obfuscated_hex: &[u8]) -> Result<[u8; 32]> {
-    if obfuscated_hex.len() != KEY_PLACEHOLDER_HEX.len() {
-        return Err(anyhow!(
-            "obfuscated key must be {} hex chars",
-            KEY_PLACEHOLDER_HEX.len()
-        ));
-    }
-    let decoded = hex::decode(obfuscated_hex)
-        .map_err(|err| anyhow!("invalid embedded key payload: {err}"))?;
-    if decoded.len() != 32 {
-        return Err(anyhow!(
-            "embedded key payload must decode to 32 bytes, got {}",
-            decoded.len()
-        ));
-    }
-    let mut buf = [0u8; 32];
-    buf.copy_from_slice(&decoded);
-    Ok(xor_with_mask(&buf))
+shard_bytes! {
+    CLIENT_KEY_SHARD0(".rdata$ks0", ".rodata.ks0") = [
+        0x37, 0xE9, 0x1C, 0x54, 0x8B, 0x20, 0xA3, 0x5E, 0xC8, 0x13, 0x6D, 0xF1,
+        PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE,
+        PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE,
+        0x5D, 0x92, 0xAE, 0x41, 0xC7, 0x1B, 0x6F, 0x28, 0x84,
+    ];
+    CLIENT_KEY_SHARD1(".rdata$ks1", ".rodata.ks1") = [
+        0xDD, 0x4A, 0x91, 0xF7, 0x08, 0x63, 0xBC, 0x2E, 0x51, 0x99, 0x03, 0x7C,
+        PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE,
+        PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE,
+        0x12, 0x7F, 0xE3, 0x58, 0xAD, 0x40, 0x9A, 0xC5, 0x31,
+    ];
+    CLIENT_KEY_SHARD2(".rdata$ks2", ".rodata.ks2") = [
+        0x48, 0xB0, 0xD7, 0x29, 0x65, 0x1A, 0x8E, 0xF3, 0x54, 0xC6, 0x0D, 0x72,
+        PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE,
+        PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE,
+        0xE1, 0x39, 0x5B, 0xA6, 0x4C, 0xF8, 0x27, 0x90, 0x13,
+    ];
+    CLIENT_KEY_SHARD3(".rdata$ks3", ".rodata.ks3") = [
+        0xAB, 0x16, 0x4D, 0xF8, 0x32, 0xC1, 0x7E, 0x95, 0x0B, 0x6A, 0xD3, 0x4F,
+        PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE,
+        PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE, PLACEHOLDER_BYTE,
+        0x73, 0x08, 0xDF, 0x42, 0xB6, 0x1C, 0x85, 0xEA, 0x59,
+    ];
 }
 
-pub fn embed_client_key_payload(bytes: &mut [u8], payload: &[u8]) -> Result<()> {
-    if payload.len() != KEY_PLACEHOLDER_HEX.len() {
-        return Err(anyhow!(
-            "client key payload must be {} bytes",
-            KEY_PLACEHOLDER_HEX.len()
-        ));
-    }
-    mutate_region(bytes, |region| {
-        if region.len() != payload.len() {
-            return Err(anyhow!(
-                "embedded region len mismatch (expected {}, got {})",
-                payload.len(),
-                region.len()
-            ));
-        }
-        region.copy_from_slice(payload);
-        Ok(())
-    })
+pub struct EmbeddedShardPattern {
+    pub start: &'static [u8],
+    pub end: &'static [u8],
+}
+
+pub fn embedded_shards() -> [EmbeddedShardPattern; SHARD_COUNT] {
+    [
+        EmbeddedShardPattern {
+            start: &CLIENT_KEY_SHARD0[..START_LEN],
+            end: &CLIENT_KEY_SHARD0[START_LEN + SHARD_LEN..],
+        },
+        EmbeddedShardPattern {
+            start: &CLIENT_KEY_SHARD1[..START_LEN],
+            end: &CLIENT_KEY_SHARD1[START_LEN + SHARD_LEN..],
+        },
+        EmbeddedShardPattern {
+            start: &CLIENT_KEY_SHARD2[..START_LEN],
+            end: &CLIENT_KEY_SHARD2[START_LEN + SHARD_LEN..],
+        },
+        EmbeddedShardPattern {
+            start: &CLIENT_KEY_SHARD3[..START_LEN],
+            end: &CLIENT_KEY_SHARD3[START_LEN + SHARD_LEN..],
+        },
+    ]
+}
+
+pub fn scatter_fragments_for_embedding(
+    base_key: &[u8; 32],
+    sanitize_hash: &str,
+) -> Result<[[u8; SHARD_LEN]; SHARD_COUNT]> {
+    let mut words = key_words(base_key);
+    obscure_words(&mut words);
+    xor_with_mask(&mut words, sanitize_hash)?;
+    Ok(words_to_fragments(&words))
+}
+
+pub fn derive_runtime_key(actual_hash: &str, client_id: &str) -> Result<[u8; 32]> {
+    let base = recover_embedded_key(actual_hash)?;
+    Ok(finalize_key_material(&base, client_id))
+}
+
+pub fn finalize_key_material(base_key: &[u8; 32], client_id: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(mask_client_id(client_id));
+    hasher.update(base_key);
+    let digest = hasher.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&digest);
+    out
 }
 
 pub fn scrub_client_key_region(bytes: &mut [u8]) -> Result<()> {
-    mutate_region(bytes, |region| {
-        for slot in region {
-            *slot = 0;
-        }
-        Ok(())
-    })
-}
-
-fn load_embedded_key() -> Result<Option<[u8; 32]>> {
-    let payload = raw_embedded_hex();
-    if payload.trim().is_empty() || payload == KEY_PLACEHOLDER_HEX {
-        return Ok(None);
+    for pattern in embedded_shards() {
+        scrub_shard(bytes, pattern.start, pattern.end)?;
     }
-    deobfuscate_key(payload.as_bytes()).map(Some)
+    Ok(())
 }
 
-fn raw_embedded_hex() -> &'static str {
-    let start = KEY_MARKER_START.len();
-    let end = CLIENT_KEY_SENTINEL.len() - KEY_MARKER_END.len();
-    &CLIENT_KEY_SENTINEL[start..end]
-}
-
-fn mutate_region(bytes: &mut [u8], mut mutator: impl FnMut(&mut [u8]) -> Result<()>) -> Result<()> {
-    let (start, end) = locate_region(bytes)?;
-    mutator(&mut bytes[start..end])
-}
-
-fn locate_region(bytes: &[u8]) -> Result<(usize, usize)> {
+fn scrub_shard(bytes: &mut [u8], start: &[u8], end: &[u8]) -> Result<()> {
     let mut cursor = 0usize;
-    let payload_len = KEY_PLACEHOLDER_HEX.len();
     while cursor < bytes.len() {
-        let Some(rel_start) = locate(&bytes[cursor..], KEY_MARKER_START) else {
+        let Some(rel_start) = locate(&bytes[cursor..], start) else {
             break;
         };
-        let start_idx = cursor + rel_start;
-        let payload_start = start_idx + KEY_MARKER_START.len();
-        if payload_start + payload_len <= bytes.len() {
-            if bytes[payload_start + payload_len..]
-                .starts_with(KEY_MARKER_END)
-            {
-                return Ok((payload_start, payload_start + payload_len));
+        let payload_start = cursor + rel_start + start.len();
+        let Some(rel_end) = locate(&bytes[payload_start..], end) else {
+            return Err(anyhow!("client key shard end marker missing"));
+        };
+        let payload_end = payload_start + rel_end;
+        if payload_end - payload_start == SHARD_LEN {
+            for slot in &mut bytes[payload_start..payload_end] {
+                *slot = 0;
             }
+            return Ok(());
         }
-        cursor = payload_start;
+        cursor = payload_start + rel_end;
     }
-    Err(anyhow!("client key sentinel region not found"))
+    Err(anyhow!("client key shard marker sequence missing"))
+}
+
+fn recover_embedded_key(actual_hash: &str) -> Result<[u8; 32]> {
+    let mut words = shard_payloads()?;
+    xor_with_mask(&mut words, actual_hash)?;
+    recover_words(&mut words);
+    Ok(words_to_bytes(&words))
+}
+
+fn shard_payloads() -> Result<[u64; SHARD_COUNT]> {
+    let shards = [
+        payload_from_static(&CLIENT_KEY_SHARD0),
+        payload_from_static(&CLIENT_KEY_SHARD1),
+        payload_from_static(&CLIENT_KEY_SHARD2),
+        payload_from_static(&CLIENT_KEY_SHARD3),
+    ];
+    if shards
+        .iter()
+        .all(|block| block.iter().all(|&b| b == PLACEHOLDER_BYTE))
+    {
+        return Err(anyhow!("client key shards still placeholders"));
+    }
+
+    let mut out = [0u64; SHARD_COUNT];
+    for (idx, block) in shards.into_iter().enumerate() {
+        out[idx] = u64::from_le_bytes(block);
+    }
+    Ok(out)
+}
+
+fn payload_from_static(block: &[u8]) -> [u8; SHARD_LEN] {
+    let mut payload = [0u8; SHARD_LEN];
+    payload.copy_from_slice(&block[START_LEN..START_LEN + SHARD_LEN]);
+    payload
+}
+
+fn xor_with_mask(words: &mut [u64; SHARD_COUNT], hash_hex: &str) -> Result<()> {
+    let mask = derive_mask(hash_hex)?;
+    let mask_words = key_words(&mask);
+    for (idx, word) in words.iter_mut().enumerate() {
+        *word ^= mask_words[idx];
+    }
+    Ok(())
+}
+
+fn key_words(bytes: &[u8; 32]) -> [u64; SHARD_COUNT] {
+    let mut out = [0u64; SHARD_COUNT];
+    for (idx, chunk) in bytes.chunks_exact(SHARD_LEN).enumerate() {
+        out[idx] = u64::from_le_bytes(chunk.try_into().unwrap());
+    }
+    out
+}
+
+fn words_to_bytes(words: &[u64; SHARD_COUNT]) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    for (idx, word) in words.iter().enumerate() {
+        out[idx * SHARD_LEN..(idx + 1) * SHARD_LEN].copy_from_slice(&word.to_le_bytes());
+    }
+    out
+}
+
+fn words_to_fragments(words: &[u64; SHARD_COUNT]) -> [[u8; SHARD_LEN]; SHARD_COUNT] {
+    let mut out = [[0u8; SHARD_LEN]; SHARD_COUNT];
+    for (idx, word) in words.iter().enumerate() {
+        out[idx].copy_from_slice(&word.to_le_bytes());
+    }
+    out
+}
+
+fn obscure_words(words: &mut [u64; SHARD_COUNT]) {
+    for round in 0..ROUND_KEYS.len() {
+        let src = round % SHARD_COUNT;
+        let dst = (round + 1) % SHARD_COUNT;
+        let mix = feistel(words[dst], ROUND_KEYS[round]);
+        words[src] ^= mix;
+        words.swap(src, dst);
+    }
+}
+
+fn recover_words(words: &mut [u64; SHARD_COUNT]) {
+    for round in (0..ROUND_KEYS.len()).rev() {
+        let src = round % SHARD_COUNT;
+        let dst = (round + 1) % SHARD_COUNT;
+        words.swap(src, dst);
+        let mix = feistel(words[dst], ROUND_KEYS[round]);
+        words[src] ^= mix;
+    }
+}
+
+fn feistel(value: u64, key: u64) -> u64 {
+    let mut x = value.wrapping_add(key);
+    x ^= x.rotate_left(((key >> 11) as u32 & 0x1F) + 1);
+    x = x.wrapping_mul(key ^ 0x9E37_79B1_85EB_CA87);
+    x.rotate_left(7) ^ (x >> 3)
+}
+
+fn derive_mask(hash_hex: &str) -> Result<[u8; 32]> {
+    if hash_hex.len() != 64 {
+        return Err(anyhow!("launcher hash must be 64 hex characters"));
+    }
+    let seed = hex::decode(hash_hex)
+        .map_err(|err| anyhow!("invalid launcher hash hex: {err}"))?;
+    let mut state = u64::from_le_bytes(seed[0..8].try_into().unwrap());
+    let mut mask = [0u8; 32];
+    for idx in 0..mask.len() {
+        state = xorshift(state ^ ROUND_KEYS[idx % ROUND_KEYS.len()]);
+        let byte = (state >> ((idx % 8) * 8)) as u8 ^ seed[idx % seed.len()];
+        mask[idx] = byte;
+    }
+    Ok(mask)
+}
+
+fn xorshift(mut state: u64) -> u64 {
+    state ^= state << 13;
+    state ^= state >> 7;
+    state ^= state << 17;
+    state
+}
+
+fn mask_client_id(client_id: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(client_id.as_bytes());
+    hasher.update(b"\xA5\x5C\x92\xb4");
+    let digest = hasher.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&digest);
+    out
 }
 
 fn locate(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -131,46 +287,23 @@ fn constant_time_eq(lhs: &[u8], rhs: &[u8]) -> bool {
         == 0
 }
 
-fn xor_with_mask(input: &[u8; 32]) -> [u8; 32] {
-    let mut out = [0u8; 32];
-    for (idx, byte) in input.iter().enumerate() {
-        out[idx] = byte ^ OBFUSCATION_MASK[idx];
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn obfuscation_round_trip() {
-        let data = [0x11u8; 32];
-        let obf = obfuscate_key(&data);
-        let payload = hex::encode(obf);
-        let recovered = deobfuscate_key(payload.as_bytes()).expect("decode");
-        assert_eq!(recovered, data);
-    }
-
-    #[test]
-    fn locate_and_embed_region() {
-        let mut blob = Vec::new();
-        blob.extend_from_slice(b"HEAD");
-        blob.extend_from_slice(KEY_MARKER_START);
-        blob.extend_from_slice(KEY_PLACEHOLDER_HEX.as_bytes());
-        blob.extend_from_slice(KEY_MARKER_END);
-        blob.extend_from_slice(b"TAIL");
-
-        let payload = b"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-        embed_client_key_payload(&mut blob, payload).expect("embed");
-        assert!(blob
-            .windows(payload.len())
-            .any(|window| window == *payload));
-
-        scrub_client_key_region(&mut blob).expect("scrub");
-        let zeros = vec![0u8; payload.len()];
-        assert!(blob
-            .windows(payload.len())
-            .any(|window| window == zeros.as_slice()));
+    fn scatter_and_recover_round_trip() {
+        let base = [0x11u8; 32];
+        let fragments = scatter_fragments_for_embedding(&base, "00553b2459c656889fc038d899ed162042272a9327efc9b448ed73fe421b4ffc")
+            .expect("scatter");
+        // Emulate runtime path
+        let mut words = [0u64; SHARD_COUNT];
+        for (idx, frag) in fragments.iter().enumerate() {
+            words[idx] = u64::from_le_bytes(*frag);
+        }
+        xor_with_mask(&mut words, "00553b2459c656889fc038d899ed162042272a9327efc9b448ed73fe421b4ffc")
+            .expect("mask");
+        recover_words(&mut words);
+        assert_eq!(words_to_bytes(&words), base);
     }
 }

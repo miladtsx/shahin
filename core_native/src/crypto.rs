@@ -52,14 +52,14 @@ fn open_with_key(key_material: &[u8], nonce_and_ct: &[u8]) -> Result<Vec<u8>> {
         .context("decrypt protected payload")
 }
 
-pub fn encrypt_data(data: &[u8]) -> Result<Vec<u8>> {
-    let key = module_key()?;
-    seal_with_key(key, data)
+pub fn encrypt_scoped(data: &[u8], scope: &str) -> Result<Vec<u8>> {
+    let key = scoped_key(scope)?;
+    seal_with_key(&key, data)
 }
 
-pub fn decrypt_data(payload: &[u8]) -> Result<Vec<u8>> {
-    let key = module_key()?;
-    open_with_key(key, payload)
+pub fn decrypt_scoped(payload: &[u8], scope: &str) -> Result<Vec<u8>> {
+    let key = scoped_key(scope)?;
+    open_with_key(&key, payload)
 }
 
 pub fn initialize_module_key(source: ModuleKeySource<'_>) -> Result<()> {
@@ -94,6 +94,18 @@ fn module_key() -> Result<&'static [u8; 32]> {
     DERIVED_KEY
         .get()
         .ok_or_else(|| anyhow!("module key not initialized"))
+}
+
+fn scoped_key(scope: &str) -> Result<[u8; 32]> {
+    let base = module_key()?;
+    let mut hasher = Sha256::new();
+    hasher.update(base);
+    hasher.update(scope.as_bytes());
+    hasher.update([scope.len() as u8]);
+    let digest = hasher.finalize();
+    let mut derived = [0u8; 32];
+    derived.copy_from_slice(&digest[..32]);
+    Ok(derived)
 }
 
 #[pyfunction]

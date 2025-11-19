@@ -188,7 +188,7 @@ fn load_protected_modules(
                 if resolved_root.is_none() {
                     resolved_root = root;
                 }
-                crypto::decrypt_data(&bytes)
+                crypto::decrypt_scoped(&bytes, spec.import_name)
                     .with_context(|| format!("decrypt {}", spec.import_name))?
             }
             Err(err) => return Err(err),
@@ -328,10 +328,11 @@ fn determine_key_source<'a>(
     launcher_hash: &'a str,
 ) -> Result<ModuleKeySource<'a>> {
     match manifest.map(|m| &m.encryption) {
-        Some(key_manifest::EncryptionMode::ClientKey { .. }) => {
-            let key = client_key::embedded_key_bytes()?.ok_or_else(|| {
-                anyhow!("client-key manifest present but launcher key is missing")
-            })?;
+        Some(key_manifest::EncryptionMode::ClientKey { key_id, .. }) => {
+            let client_id = key_id
+                .as_deref()
+                .ok_or_else(|| anyhow!("client manifest missing key_id"))?;
+            let key = client_key::derive_runtime_key(launcher_hash, client_id)?;
             Ok(ModuleKeySource::Direct(key))
         }
         _ => Ok(ModuleKeySource::LauncherHash(launcher_hash)),
@@ -522,7 +523,7 @@ fn stage_protected_assets(roots: &[PathBuf]) -> Result<PathBuf> {
     for spec in protected::PROTECTED_ASSETS {
         let encrypted = locate_encrypted_payload(roots, spec.encrypted_name);
         let plaintext = match encrypted {
-            Ok((bytes, _)) => crypto::decrypt_data(&bytes)
+            Ok((bytes, _)) => crypto::decrypt_scoped(&bytes, spec.label)
                 .with_context(|| format!("decrypt asset {}", spec.label))?,
             Err(err) => return Err(err),
         };

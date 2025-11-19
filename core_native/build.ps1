@@ -251,7 +251,7 @@ Run-Quiet -Command $embedTool -Args $embedArgs
 # --- Step 4b: Embed client key (if provided) --------------------------
 if ($ResolvedClientKey) {
     Write-Stage "Embed client key"
-    Run-Quiet -Command $embedKeyExe -Args @($ResolvedClientKey, $exePath)
+    Run-Quiet -Command $embedKeyExe -Args @($ResolvedClientKey, $preSanitized, $exePath)
 }
 
 # --- Step 5: Re-hash after embed for sanity ---------------------------

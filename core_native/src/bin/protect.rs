@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use core_native::{crypto, integrity, key_manifest, protected};
+use core_native::{client_key, crypto, integrity, key_manifest, protected};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -47,9 +47,13 @@ fn run() -> Result<()> {
 
 fn configure_module_key(client_key: Option<&ClientKeyInput>) -> Result<key_manifest::KeyManifest> {
     if let Some(key) = client_key {
-        crypto::initialize_module_key(ModuleKeySource::Direct(key.bytes))?;
-        let hint = integrity::sha256_of_bytes(&key.bytes);
-        return Ok(key_manifest::KeyManifest::client_key(key.client_id.clone(), Some(hint)));
+        let finalized = client_key::finalize_key_material(&key.bytes, &key.client_id);
+        crypto::initialize_module_key(ModuleKeySource::Direct(finalized))?;
+        let hint = integrity::sha256_of_bytes(&finalized);
+        return Ok(key_manifest::KeyManifest::client_key(
+            Some(key.client_id.clone()),
+            Some(hint),
+        ));
     }
 
     let manifest = if let Some(expected) = protected::expected_self_hash() {
@@ -82,7 +86,7 @@ fn seal_payload(
             digest
         ));
     }
-    let encrypted = crypto::encrypt_data(&plaintext)?;
+    let encrypted = crypto::encrypt_scoped(&plaintext, label)?;
     let target_path = out_dir.join(encrypted_relative);
     if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent)
@@ -107,7 +111,7 @@ struct ProtectOptions {
 #[derive(Clone)]
 struct ClientKeyInput {
     bytes: [u8; 32],
-    client_id: Option<String>,
+    client_id: String,
 }
 
 fn parse_args<I>(mut args: I) -> Result<ProtectOptions>
@@ -139,7 +143,11 @@ where
                 let value = args
                     .next()
                     .ok_or_else(|| anyhow!("--client-id requires a value"))?;
-                client_id = Some(value);
+                let trimmed = value.trim().to_string();
+                if trimmed.is_empty() {
+                    return Err(anyhow!("--client-id cannot be empty"));
+                }
+                client_id = Some(trimmed);
             }
             unknown => {
                 return Err(anyhow!("unknown argument: {unknown}"));
@@ -147,13 +155,15 @@ where
         }
     }
 
-    if client_id.is_some() && client_key_bytes.is_none() {
-        return Err(anyhow!("--client-id requires --client-key"));
+    if (client_key_bytes.is_some() && client_id.is_none())
+        || (client_id.is_some() && client_key_bytes.is_none())
+    {
+        return Err(anyhow!("--client-key and --client-id must be provided together"));
     }
 
     let client_key = client_key_bytes.map(|bytes| ClientKeyInput {
         bytes,
-        client_id,
+        client_id: client_id.expect("client id present with key"),
     });
 
     Ok(ProtectOptions {
