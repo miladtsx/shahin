@@ -1,12 +1,15 @@
 use anyhow::{anyhow, bail, Context, Result};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use core_native::crypto::ModuleKeySource;
 use core_native::{
     client_key, core_native_py, crypto, integrity, key_manifest, protected, selfhash,
 };
+use pyo3::types::PyByteArray;
 use pyo3::{
     prelude::*,
     types::{PyDict, PyList, PyModule},
 };
+use rand::{rng, RngCore};
 use std::{
     collections::HashMap,
     env, fs,
@@ -19,38 +22,78 @@ use walkdir::WalkDir;
 const MEMORY_IMPORTER: &str = r#"
 import importlib.abc
 import importlib.machinery
+import os
 import sys
 
 _FINDER = None
+_TOKEN_ENV = "SHAHIN_LAUNCH_TOKEN"
+
+
+def _zeroize(buf):
+    if buf is None:
+        return
+    mv = memoryview(buf)
+    try:
+        for idx in range(len(mv)):
+            mv[idx] = 0
+    finally:
+        mv.release()
 
 
 class _MemoryLoader(importlib.abc.Loader):
-    def __init__(self, fullname, source):
+    def __init__(self, fullname, payload):
         self.fullname = fullname
-        self.source = source
+        self._payload = payload
 
     def create_module(self, spec):
         return None
 
     def exec_module(self, module):
+        if self._payload is None:
+            raise ImportError(f"{self.fullname} payload already consumed", name=self.fullname)
         module.__file__ = f"<protected>/{self.fullname.replace('.', '/')}.py"
-        exec(compile(self.source, module.__file__, "exec"), module.__dict__)
+        module.__loader__ = self
+        payload = self._payload
+        self._payload = None
+        try:
+            code = compile(payload, module.__file__, "exec")
+        finally:
+            _zeroize(payload)
+        exec(code, module.__dict__)
+
+    def get_source(self, fullname):
+        raise OSError("protected module; source unavailable")
+
+    def get_data(self, path):
+        raise OSError("protected module; data unavailable")
 
 
 class _MemoryFinder(importlib.abc.MetaPathFinder):
-    def __init__(self, modules):
+    def __init__(self, modules, token):
         self.modules = modules
+        self.token = token
+
+    def _authorized(self):
+        return os.environ.get(_TOKEN_ENV) == self.token
 
     def find_spec(self, fullname, path, target=None):
-        if fullname in self.modules:
-            loader = _MemoryLoader(fullname, self.modules[fullname])
+        if fullname not in self.modules:
+            return None
+        if not self._authorized():
+            raise ImportError("protected loader requires launcher", name=fullname)
+        payload = self.modules.pop(fullname, None)
+        if payload is not None:
+            loader = _MemoryLoader(fullname, payload)
             return importlib.machinery.ModuleSpec(fullname, loader, is_package=False)
         return None
 
 
-def install_memory_importer(modules):
+def install_memory_importer(modules, token):
+    env_token = os.environ.get(_TOKEN_ENV)
+    if env_token is None or env_token != token:
+        raise RuntimeError("protected loader can only be installed by the launcher")
     global _FINDER
-    finder = _MemoryFinder(modules)
+    finder = _MemoryFinder(modules, token)
     if _FINDER in sys.meta_path:
         sys.meta_path.remove(_FINDER)
     _FINDER = finder
@@ -81,18 +124,21 @@ fn run() -> Result<()> {
         spawn_integrity_beacon(exe_path.clone(), expected.to_ascii_lowercase());
     }
 
-    let (modules, payload_root) = load_protected_modules(&bundle_roots)?;
+    let (mut modules, payload_root) = load_protected_modules(&bundle_roots)?;
     if let Some(root) = payload_root.as_ref() {
         env::set_var("WIN_PD", root);
     }
     let models_dir = stage_protected_assets(&bundle_roots)?;
     env::set_var("WIN_MDL", models_dir.to_string_lossy().as_ref());
 
+    let importer_token = generate_launch_token();
+    env::set_var("SHAHIN_LAUNCH_TOKEN", &importer_token);
+
     // Expose the bundled core_native module to the embedded interpreter so
     // Python imports succeed even when no external .pyd is available.
     pyo3::append_to_inittab!(core_native_py);
     pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| bootstrap_python(py, &modules, &args, &exe_path))
+    Python::with_gil(|py| bootstrap_python(py, &mut modules, &args, &exe_path, &importer_token))
         .map_err(|err| anyhow!(err.to_string()))?;
     Ok(())
 }
@@ -177,7 +223,7 @@ fn constant_time_hex_eq(lhs: &str, rhs: &str) -> bool {
 
 fn load_protected_modules(
     bundle_roots: &[PathBuf],
-) -> Result<(HashMap<String, String>, Option<PathBuf>)> {
+) -> Result<(HashMap<String, Vec<u8>>, Option<PathBuf>)> {
     let mut modules = HashMap::new();
     let mut resolved_root: Option<PathBuf> = None;
 
@@ -203,9 +249,9 @@ fn load_protected_modules(
                 digest
             );
         }
-        let source = String::from_utf8(plaintext)
+        std::str::from_utf8(&plaintext)
             .map_err(|_| anyhow!("{} is not valid UTF-8 source", spec.import_name))?;
-        modules.insert(spec.import_name.to_string(), source);
+        modules.insert(spec.import_name.to_string(), plaintext);
     }
 
     ensure_package_stubs(&mut modules);
@@ -213,7 +259,7 @@ fn load_protected_modules(
     Ok((modules, resolved_root))
 }
 
-fn ensure_package_stubs(modules: &mut HashMap<String, String>) {
+fn ensure_package_stubs(modules: &mut HashMap<String, Vec<u8>>) {
     use std::collections::{HashMap as Map, HashSet};
 
     let mut tree: Map<String, HashSet<String>> = Map::new();
@@ -246,7 +292,7 @@ fn ensure_package_stubs(modules: &mut HashMap<String, String>) {
             body.push_str("    __path__ = extend_path(__path__, __name__)\n");
             body.push_str("else:\n");
             body.push_str("    __path__ = extend_path([], __name__)\n");
-            body
+            body.into_bytes()
         });
     }
 }
@@ -341,11 +387,12 @@ fn determine_key_source<'a>(
 
 fn bootstrap_python(
     py: Python<'_>,
-    modules: &HashMap<String, String>,
+    modules: &mut HashMap<String, Vec<u8>>,
     args: &LaunchArgs,
     exe_path: &Path,
+    token: &str,
 ) -> PyResult<()> {
-    install_memory_importer(py, modules)?;
+    install_memory_importer(py, modules, token)?;
 
     let sys = py.import_bound("sys")?;
     inherit_bundle_sys_path(py, &sys)?;
@@ -382,20 +429,33 @@ fn bootstrap_python(
 
 fn install_memory_importer<'py>(
     py: Python<'py>,
-    modules: &HashMap<String, String>,
+    modules: &mut HashMap<String, Vec<u8>>,
+    token: &str,
 ) -> PyResult<()> {
     let module =
         PyModule::from_code_bound(py, MEMORY_IMPORTER, "memory_loader.py", "memory_loader")?;
     let install = module.getattr("install_memory_importer")?;
     let payloads = PyDict::new_bound(py);
-    for (name, source) in modules {
-        payloads.set_item(name, source)?;
+    for (name, source) in modules.iter_mut() {
+        let py_bytes = PyByteArray::new_bound(py, source.as_slice());
+        for b in source.iter_mut() {
+            *b = 0;
+        }
+        payloads.set_item(name, &py_bytes)?;
     }
-    install.call1((payloads.as_any(),))?;
+    modules.clear();
+    install.call1((payloads.as_any(), token))?;
     Ok(())
 }
 
-fn inherit_bundle_sys_path(py: Python<'_>, sys: &Bound<'_, PyModule>) -> PyResult<()> {
+fn generate_launch_token() -> String {
+    let mut buf = [0u8; 32];
+    let mut rng = rng();
+    rng.fill_bytes(&mut buf);
+    URL_SAFE_NO_PAD.encode(buf)
+}
+
+fn inherit_bundle_sys_path(_py: Python<'_>, sys: &Bound<'_, PyModule>) -> PyResult<()> {
     let Ok(raw) = env::var("WIN_SYSPATH") else {
         return Ok(());
     };
