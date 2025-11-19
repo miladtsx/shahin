@@ -31,4 +31,19 @@ logs/
 target
 build
 dist
-res/dataset/newplates
+res/dataset
+
+.tool-versions
+ node_modules
+ dist
+ .env
+ TODO.md
+ dev/*
+ .zed
+ target
+ target/release
+ target/debug
+ AGENTS.md
+ dataset
+ build
+ cache

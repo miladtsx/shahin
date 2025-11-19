@@ -1,4 +1,4 @@
-use crate::integrity;
+use crate::{client_key, integrity};
 #[cfg(target_os = "windows")]
 use crate::markers;
 #[cfg(not(target_os = "windows"))]
@@ -24,6 +24,7 @@ pub fn sanitized_hash_of_file(path: &Path) -> Result<String> {
     let data = fs::read(path).with_context(|| format!("read {}", path.display()))?;
     let mut scrubbed = data.clone();
     scrub_shn_section(&mut scrubbed)?;
+    client_key::scrub_client_key_region(&mut scrubbed)?;
     Ok(obfuscated_digest(&scrubbed))
 }
 
@@ -32,6 +33,7 @@ pub fn sanitized_hash_of_file(path: &Path) -> Result<String> {
 pub fn sanitized_hash_of_file(path: &Path) -> Result<String> {
     let mut data = fs::read(path).with_context(|| format!("read {}", path.display()))?;
     scrub_embedded_hash(&mut data)?;
+    client_key::scrub_client_key_region(&mut data)?;
     Ok(obfuscated_digest(&data))
 }
 

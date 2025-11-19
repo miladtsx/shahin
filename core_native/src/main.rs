@@ -1,5 +1,8 @@
 use anyhow::{anyhow, bail, Context, Result};
-use core_native::{core_native_py, crypto, integrity, protected, selfhash};
+use core_native::crypto::ModuleKeySource;
+use core_native::{
+    client_key, core_native_py, crypto, integrity, key_manifest, protected, selfhash,
+};
 use pyo3::{
     prelude::*,
     types::{PyDict, PyList, PyModule},
@@ -67,22 +70,23 @@ fn run() -> Result<()> {
     let args = LaunchArgs::from_env()?;
     let exe_path = env::current_exe().context("locate current executable")?;
     let actual_hash = verify_self_hash(&exe_path)?;
-    env::set_var("SHAHIN_LAUNCHER", &exe_path);
-    env::set_var("SHAHIN_SELF_HASH", &actual_hash);
-    crypto::initialize_module_key(Some(&actual_hash))?;
+    env::set_var("WIN_ENTRY", &exe_path);
+    env::set_var("WIN_INTEGRITY", &actual_hash);
+    let bundle_roots = candidate_payload_roots(&exe_path);
+    let manifest = locate_key_manifest(&bundle_roots)?;
+    let key_source = determine_key_source(manifest.as_ref(), &actual_hash)?;
+    crypto::initialize_module_key(key_source)?;
 
     if let Some(expected) = protected::expected_self_hash() {
         spawn_integrity_beacon(exe_path.clone(), expected.to_ascii_lowercase());
     }
 
-    let dev_mode = dev_mode_enabled();
-    let bundle_roots = candidate_payload_roots(&exe_path);
-    let (modules, payload_root) = load_protected_modules(&bundle_roots, dev_mode)?;
+    let (modules, payload_root) = load_protected_modules(&bundle_roots)?;
     if let Some(root) = payload_root.as_ref() {
-        env::set_var("SHAHIN_PROTECTED_DIR", root);
+        env::set_var("WIN_PD", root);
     }
-    let models_dir = stage_protected_assets(&bundle_roots, dev_mode)?;
-    env::set_var("SHAHIN_MODELS_DIR", models_dir.to_string_lossy().as_ref());
+    let models_dir = stage_protected_assets(&bundle_roots)?;
+    env::set_var("WIN_MDL", models_dir.to_string_lossy().as_ref());
 
     // Expose the bundled core_native module to the embedded interpreter so
     // Python imports succeed even when no external .pyd is available.
@@ -173,10 +177,8 @@ fn constant_time_hex_eq(lhs: &str, rhs: &str) -> bool {
 
 fn load_protected_modules(
     bundle_roots: &[PathBuf],
-    dev_mode: bool,
 ) -> Result<(HashMap<String, String>, Option<PathBuf>)> {
     let mut modules = HashMap::new();
-    let source_root = Path::new(protected::SOURCE_ROOT);
     let mut resolved_root: Option<PathBuf> = None;
 
     for spec in protected::PROTECTED_MODULES {
@@ -188,14 +190,6 @@ fn load_protected_modules(
                 }
                 crypto::decrypt_data(&bytes)
                     .with_context(|| format!("decrypt {}", spec.import_name))?
-            }
-            Err(err) if dev_mode => {
-                eprintln!(
-                    "[dev] {}: {err}; falling back to plaintext file",
-                    spec.import_name
-                );
-                fs::read(source_root.join(spec.plaintext_path))
-                    .with_context(|| format!("read plaintext {}", spec.plaintext_path))?
             }
             Err(err) => return Err(err),
         };
@@ -300,7 +294,7 @@ fn locate_encrypted_payload(
 
 fn candidate_payload_roots(exe_path: &Path) -> Vec<PathBuf> {
     let mut roots = Vec::new();
-    if let Ok(custom) = env::var("SHAHIN_PROTECTED_DIR") {
+    if let Ok(custom) = env::var("WIN_PD") {
         roots.push(PathBuf::from(custom));
     }
     if let Some(dir) = exe_path.parent() {
@@ -312,6 +306,36 @@ fn candidate_payload_roots(exe_path: &Path) -> Vec<PathBuf> {
     }
     roots.push(Path::new(protected::SOURCE_ROOT).join("build/protected"));
     roots
+}
+
+fn locate_key_manifest(roots: &[PathBuf]) -> Result<Option<key_manifest::KeyManifest>> {
+    for root in roots {
+        match key_manifest::read_manifest(root) {
+            Ok(Some(manifest)) => return Ok(Some(manifest)),
+            Ok(None) => continue,
+            Err(err) => {
+                return Err(
+                    err.context(format!("load key manifest from {}", root.to_string_lossy()))
+                );
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn determine_key_source<'a>(
+    manifest: Option<&'a key_manifest::KeyManifest>,
+    launcher_hash: &'a str,
+) -> Result<ModuleKeySource<'a>> {
+    match manifest.map(|m| &m.encryption) {
+        Some(key_manifest::EncryptionMode::ClientKey { .. }) => {
+            let key = client_key::embedded_key_bytes()?.ok_or_else(|| {
+                anyhow!("client-key manifest present but launcher key is missing")
+            })?;
+            Ok(ModuleKeySource::Direct(key))
+        }
+        _ => Ok(ModuleKeySource::LauncherHash(launcher_hash)),
+    }
 }
 
 fn bootstrap_python(
@@ -371,7 +395,7 @@ fn install_memory_importer<'py>(
 }
 
 fn inherit_bundle_sys_path(py: Python<'_>, sys: &Bound<'_, PyModule>) -> PyResult<()> {
-    let Ok(raw) = env::var("SHAHIN_BUNDLE_SYSPATH") else {
+    let Ok(raw) = env::var("WIN_SYSPATH") else {
         return Ok(());
     };
     if raw.trim().is_empty() {
@@ -488,32 +512,18 @@ impl LaunchArgs {
     }
 }
 
-fn dev_mode_enabled() -> bool {
-    //TODO remove
-    cfg!(debug_assertions) || env::var_os("SHAHIN_DEV_ALLOW_PLAINTEXT").is_some()
-}
-
-fn stage_protected_assets(roots: &[PathBuf], dev_mode: bool) -> Result<PathBuf> {
-    let cache_dir = env::temp_dir().join(format!("shahin_models_{}", process::id()));
+fn stage_protected_assets(roots: &[PathBuf]) -> Result<PathBuf> {
+    let cache_dir = env::temp_dir().join(format!("win_mlds_{}", process::id()));
     if cache_dir.exists() {
         let _ = fs::remove_dir_all(&cache_dir);
     }
     fs::create_dir_all(&cache_dir)?;
-    let source_root = Path::new(protected::SOURCE_ROOT);
 
     for spec in protected::PROTECTED_ASSETS {
         let encrypted = locate_encrypted_payload(roots, spec.encrypted_name);
         let plaintext = match encrypted {
             Ok((bytes, _)) => crypto::decrypt_data(&bytes)
                 .with_context(|| format!("decrypt asset {}", spec.label))?,
-            Err(err) if dev_mode => {
-                eprintln!(
-                    "[dev] asset {}: {err}; falling back to plaintext file",
-                    spec.label
-                );
-                fs::read(source_root.join(spec.plaintext_path))
-                    .with_context(|| format!("read plaintext {}", spec.plaintext_path))?
-            }
             Err(err) => return Err(err),
         };
         let digest = integrity::sha256_of_bytes(&plaintext);

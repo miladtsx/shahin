@@ -22,9 +22,6 @@ except Exception as e:
 
 
 def _read_expected_hash() -> str | None:
-    v = os.environ.get("SHAHIN_EXPECTED_MAIN_HASH")
-    if v:
-        return v.strip()
     p = os.path.join(os.path.dirname(__file__), "res", "main.py.sha256")
     try:
         with open(p, "r") as f:
@@ -54,7 +51,7 @@ def _check_integrity_and_authorization() -> bool:
     else:
         logger.warning(
             "no_expected_hash_provided",
-            extra={"hint": "set SHAHIN_EXPECTED_MAIN_HASH or res/main.py.sha256"},
+            extra={"hint": "set SHAHIN_EXPECTED_MAIN_HASH"},
         )
 
     # check machine fingerprint if requested

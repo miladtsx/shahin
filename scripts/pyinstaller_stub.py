@@ -63,12 +63,12 @@ def _pause_on_exit(returncode: int) -> None:
 
 def main() -> None:
     bundle_root = _resource_base()
-    os.environ["SHAHIN_BUNDLE_ROOT"] = str(bundle_root)
+    os.environ["WIN_BUN_PATH"] = str(bundle_root)
     launcher = _resolve_launcher()
     # Share the bundle's sys.path with the Rust-side interpreter so it can import
     # the same vendored modules that PyInstaller exposes to this stub.
     bundle_sys_path = os.pathsep.join(dict.fromkeys(sys.path))
-    os.environ["SHAHIN_BUNDLE_SYSPATH"] = bundle_sys_path
+    os.environ["WIN_SYSPATH"] = bundle_sys_path
     cmd = [str(launcher), *sys.argv[1:]]
     # Inherit stdio so logging and prompts behave identically to
     # launching the Rust executable directly.

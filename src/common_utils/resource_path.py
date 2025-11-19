@@ -1,7 +1,7 @@
 import os, sys
 from pathlib import Path
 
-_MODELS_OVERRIDE = os.environ.get("SHAHIN_MODELS_DIR")
+_MODELS_OVERRIDE = os.environ.get("WIN_MDL")
 
 
 def get_resource_path(relative_path):
@@ -10,7 +10,7 @@ def get_resource_path(relative_path):
     if _MODELS_OVERRIDE and normalized.startswith("res/models/"):
         return str(Path(_MODELS_OVERRIDE) / Path(relative_path).name)
 
-    bundle_root = os.environ.get("SHAHIN_BUNDLE_ROOT")
+    bundle_root = os.environ.get("WIN_BUN_PATH")
     if getattr(sys, "frozen", False):
         # Path inside the PyInstaller bundle
         base_path = getattr(sys, "_MEIPASS", bundle_root or os.path.abspath("."))

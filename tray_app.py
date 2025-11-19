@@ -63,7 +63,7 @@ def _normalize_args(raw: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
 
 def build_command(mode, extra_args=None):
     extra_args = extra_args or []
-    launcher = os.environ.get("SHAHIN_LAUNCHER")
+    launcher = os.environ.get("WIN_ENTRY")
     if launcher:
         return [launcher, "--mode", mode, *extra_args]
     if getattr(sys, "frozen", False):

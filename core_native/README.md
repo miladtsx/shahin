@@ -25,3 +25,16 @@ Use `strip`/`objcopy` from `binutils` if the LLVM variants are unavailable.
 
 Set `CORE_NATIVE_DISABLE_PACKING=1` in the environment to skip the automatic
 linker flags for local debugging builds.
+
+## Client-specific sealing
+
+`core_native/build.ps1` accepts `-ClientId` (and optionally an explicit
+`-ClientKeyHex`/`-ClientKeyFile`). When `-ClientId` is provided the build
+automatically creates or reuses a random 32-byte secret stored at
+`.keys/client-<id>.key` (this path sits at the repo root and is ignored by git).
+That key both encrypts the Python/asset payloads and gets embedded—after
+obfuscation—into the Rust launcher via `embedkey`, so nothing outside Rust ever
+sees the raw material. The `protect` helper still writes
+`protected/key_manifest.json` noting whether payloads expect launcher-hash
+derivation or a client key; keeping the `.keys/client-*.key` files lets you
+repackage updates for that client later without changing their decryption key.

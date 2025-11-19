@@ -11,9 +11,9 @@ pub struct ShnRegion {
 #[link_section = ".shn"]
 #[used]
 pub static SHN_REGION: ShnRegion = ShnRegion {
-    start: *b"SHAHIN\0START\0\0\0\0",
+    start: *b"SYSTEM\0START\0\0\0\0",
     payload: [0u8; 64],
-    end: *b"SHAHIN\0END\0\0\0\0\0\0",
+    end: *b"SYSTEM\0END\0\0\0\0\0\0",
 };
 
 pub fn shn_start_magic() -> &'static [u8; 16] {

@@ -17,13 +17,13 @@ pub const PROTECTED_MODULES: &[ProtectedModuleSpec] = &[
         import_name: "main",
         plaintext_path: "main.py",
         encrypted_name: "main.bin",
-        expected_sha256: "6fe2a3035a89a783c480a2eed7dddc7eeb0638bfb2a1756217518c16bd03d96c",
+        expected_sha256: "c1d9dafca2d0a6c1d572132c2ee30f413bf416ce2c94ad8f18151badf4ff3c38",
     },
     ProtectedModuleSpec {
         import_name: "tray_app",
         plaintext_path: "tray_app.py",
         encrypted_name: "tray_app.bin",
-        expected_sha256: "2295f6699f18f696e3cd385835a618797bc4174bc7a22e556e906300ef8bd206",
+        expected_sha256: "1f144ee460f1ae7f57a47421e3ac84b999a209cc9755e563b0232c83296d3b06",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.app_logger",
@@ -35,7 +35,7 @@ pub const PROTECTED_MODULES: &[ProtectedModuleSpec] = &[
         import_name: "src.common_utils.resource_path",
         plaintext_path: "src/common_utils/resource_path.py",
         encrypted_name: "resource_path.bin",
-        expected_sha256: "cc1addf79662c974ddf47cac1549762222462141b62322544fb373eb057bdc8f",
+        expected_sha256: "d1e89dc903794a03e2f85a8d301c90211b56577951870b94a3ae2cf57484611c",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.license_utils",
@@ -85,17 +85,17 @@ pub const PROTECTED_ASSETS: &[ProtectedAssetSpec] = &[
 ];
 
 #[cfg(not(target_os = "windows"))]
-pub const SELF_HASH_MARKER_START: &str = "__SHAHIN_SELF_HASH_BEGIN__";
+pub const SELF_HASH_MARKER_START: &str = "__WIN_INTEGRITY_BEGIN__";
 #[cfg(not(target_os = "windows"))]
-pub const SELF_HASH_MARKER_END: &str = "__SHAHIN_SELF_HASH_END__";
+pub const SELF_HASH_MARKER_END: &str = "__WIN_INTEGRITY_END__";
 
 #[cfg(not(target_os = "windows"))]
 #[used]
 #[link_section = ".rodata.sha_guard"]
 static SELF_HASH_PROBE: &str = concat!(
-    "__SHAHIN_SELF_HASH_BEGIN__",
+    "__WIN_INTEGRITY_BEGIN__",
     include_str!("../protected/self.sha256"),
-    "__SHAHIN_SELF_HASH_END__",
+    "__WIN_INTEGRITY_END__",
 );
 
 pub const PROTECTED_SUBDIR: &str = "protected";

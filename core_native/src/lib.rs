@@ -3,8 +3,10 @@
 pub mod crypto;
 #[cfg(feature = "hardened")]
 mod hardened;
+pub mod client_key;
 mod hwid;
 pub mod integrity;
+pub mod key_manifest;
 mod licensing;
 #[cfg(target_os = "windows")]
 mod markers;

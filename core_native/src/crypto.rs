@@ -14,6 +14,13 @@ const KEY_SEED: [u8; 32] = [
 ];
 static DERIVED_KEY: OnceCell<[u8; 32]> = OnceCell::new();
 
+#[derive(Clone, Copy)]
+pub enum ModuleKeySource<'a> {
+    LauncherHash(&'a str),
+    Direct([u8; 32]),
+    DefaultSeed,
+}
+
 fn cipher_from_key(key_material: &[u8]) -> Result<ChaCha20Poly1305> {
     if key_material.len() != 32 {
         return Err(anyhow!("module key must be 32 bytes"));
@@ -55,10 +62,11 @@ pub fn decrypt_data(payload: &[u8]) -> Result<Vec<u8>> {
     open_with_key(key, payload)
 }
 
-pub fn initialize_module_key(hash_hex: Option<&str>) -> Result<()> {
-    DERIVED_KEY.get_or_try_init(|| match hash_hex {
-        Some(value) => derive_key_material(value),
-        None => Ok(KEY_SEED),
+pub fn initialize_module_key(source: ModuleKeySource<'_>) -> Result<()> {
+    DERIVED_KEY.get_or_try_init(|| match source {
+        ModuleKeySource::LauncherHash(value) => derive_key_material(value),
+        ModuleKeySource::Direct(bytes) => Ok(bytes),
+        ModuleKeySource::DefaultSeed => Ok(KEY_SEED),
     })?;
     Ok(())
 }
