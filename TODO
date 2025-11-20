@@ -8,3 +8,4 @@
 [] common errors reading video streams and make the app resilient.
 [] cpu vs gpu, how to tell the difference?
 [] protect ai models as well as the code.
+[] protect the license from pc time tampering. (securely and obfuscated and non intrusively)
