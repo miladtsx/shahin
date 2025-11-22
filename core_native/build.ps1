@@ -113,6 +113,107 @@ function Invoke-Cargo {
     }
 }
 
+function Get-FullPathFromRoot {
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$Relative
+    )
+    $normalized = $Relative -replace '/', [System.IO.Path]::DirectorySeparatorChar
+    return [System.IO.Path]::GetFullPath((Join-Path $Root $normalized))
+}
+
+function Compute-FileSha256 {
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Expected file not found: $Path"
+    }
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $hash = $sha.ComputeHash($stream)
+    } finally {
+        $stream.Dispose()
+        $sha.Dispose()
+    }
+    return ([System.BitConverter]::ToString($hash)).Replace('-', '').ToLowerInvariant()
+}
+
+function Update-ProtectedExpectedHashes {
+    param(
+        [Parameter(Mandatory)][string]$ProtectedRsPath,
+        [Parameter(Mandatory)][string]$RepoRoot
+    )
+
+    $lines = Get-Content -LiteralPath $ProtectedRsPath
+    $currentPlaintext = $null
+    $digestMap = @{}
+    $changed = $false
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        if ($line -match 'plaintext_path:\s*"([^"]+)"') {
+            $currentPlaintext = $matches[1]
+        }
+        if ($line -match 'expected_sha256:\s*"([0-9a-fA-F]{64})"') {
+            if (-not $currentPlaintext) {
+                throw "protected.rs: expected_sha256 appeared before plaintext_path near line $($i + 1)"
+            }
+            $abs = Get-FullPathFromRoot -Root $RepoRoot -Relative $currentPlaintext
+            $digest = Compute-FileSha256 -Path $abs
+            $digestMap[$currentPlaintext] = $digest
+            $existing = $matches[1].ToLowerInvariant()
+            if ($digest -ne $existing) {
+                $lines[$i] = $line -replace '(?<=expected_sha256:\s*")[0-9a-fA-F]{64}(?=")', $digest
+                $changed = $true
+                Write-Info ("{0}: updated expected hash ({1} -> {2})" -f $currentPlaintext, $existing, $digest)
+            } 
+            $currentPlaintext = $null
+        }
+    }
+
+    if ($changed) {
+        Set-Content -LiteralPath $ProtectedRsPath -Value $lines -Encoding UTF8
+        Write-Info "protected.rs hashes refreshed"
+    } else {
+        Write-Info "protected.rs already up to date"
+    }
+
+    return $digestMap
+}
+
+function Update-MainHashFile {
+    param(
+        [Parameter(Mandatory)][string]$MainPath,
+        [Parameter(Mandatory)][string]$HashPath,
+        [hashtable]$KnownHashes
+    )
+
+    $digest = $null
+    if ($KnownHashes -and $KnownHashes.ContainsKey('main.py')) {
+        $digest = $KnownHashes['main.py']
+    } else {
+        $digest = Compute-FileSha256 -Path $MainPath
+    }
+
+    $existing = $null
+    if (Test-Path -LiteralPath $HashPath) {
+        $existing = (Get-Content -LiteralPath $HashPath -Raw).Trim()
+    }
+
+    $hashDir = Split-Path -Parent $HashPath
+    if ($hashDir -and -not (Test-Path -LiteralPath $hashDir)) {
+        New-Item -ItemType Directory -Force -Path $hashDir | Out-Null
+    }
+
+    if (-not $existing -or $existing.ToLowerInvariant() -ne $digest) {
+        Set-Content -LiteralPath $HashPath -Value ($digest + [Environment]::NewLine) -Encoding UTF8
+        $prev = if ($existing) { $existing } else { "missing" }
+        Write-Info ("res/main.py.sha256 updated ({0} -> {1})" -f $prev, $digest)
+    } else {
+        Write-Info "res/main.py.sha256 already matches main.py"
+    }
+}
+
 # --- Path resolution --------------------------------------------------
 Write-Stage "Resolve paths"
 
@@ -193,6 +294,12 @@ if ($ClientId) {
 } elseif (-not $ResolvedClientKey) {
     Write-Info "Building without client-specific key (launcher hash derivation will be used)"
 }
+
+# --- Refresh expected hashes -----------------------------------------
+Write-Stage "Refresh expected hashes"
+$protectedRsPath = Join-Path $nativeDir 'src/protected.rs'
+$hashMap = Update-ProtectedExpectedHashes -ProtectedRsPath $protectedRsPath -RepoRoot $root
+Update-MainHashFile -MainPath (Join-Path $root 'main.py') -HashPath (Join-Path $root 'res/main.py.sha256') -KnownHashes $hashMap
 
 # --- Clean previous artifacts (optional) ------------------------------
 Write-Stage "Clean previous artifacts (if any)"
