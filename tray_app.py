@@ -281,7 +281,20 @@ def _open_activation_dialog(reason=None):
                     return
                 status = license_utils.activate_license(blob)
                 if status.valid:
-                    messagebox.showinfo("فعال‌سازی موفق", "فرایند اهراز هویت با موفقیت انجام شد")
+                    messagebox.showinfo(
+                        "فعال‌سازی موفق", "فرایند اهراز هویت با موفقیت انجام شد"
+                    )
+                    try:
+                        logger.info(
+                            "License activated; auto-starting backend and dashboard"
+                        )
+                        start_dashboard()
+                        start_backend()
+                    except Exception as exc:
+                        logger.exception(
+                            "autostart_failed_after_activation",
+                            extra={"error": str(exc)},
+                        )
                     root.destroy()
                 else:
                     messagebox.showerror(
@@ -326,7 +339,7 @@ def tray_main(args: Mapping[str, Any]):
             "no_autostart": args["no_autostart"],
         },
     )
-    shah_in_controls = MenuItem(
+    service_controls = MenuItem(
         "شاهین",
         Menu(
             MenuItem("شروع", lambda _: start_backend()),
@@ -341,7 +354,7 @@ def tray_main(args: Mapping[str, Any]):
         ),
     )
     menu = Menu(
-        shah_in_controls,
+        service_controls,
         dashboard_controls,
         MenuItem("فعال‌سازی", lambda _: _open_activation_dialog()),
         MenuItem("خروج", stop_all),
@@ -352,11 +365,10 @@ def tray_main(args: Mapping[str, Any]):
     if not args["no_autostart"]:
         if license_utils.license_is_valid():
             start_backend()
-            start_dashboard(
-                open_browser=not args["no_browser"], url=tray_config["url"]
-            )
+            start_dashboard(open_browser=not args["no_browser"], url=tray_config["url"])
         else:
             logger.warning("Skipping autostart: license missing or invalid")
+            _open_activation_dialog()
 
     icon.run()
 

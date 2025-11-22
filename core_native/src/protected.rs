@@ -23,7 +23,7 @@ pub const PROTECTED_MODULES: &[ProtectedModuleSpec] = &[
         import_name: "tray_app",
         plaintext_path: "tray_app.py",
         encrypted_name: "tray_app.bin",
-        expected_sha256: "1f144ee460f1ae7f57a47421e3ac84b999a209cc9755e563b0232c83296d3b06",
+        expected_sha256: "c81097704ef7e2c6dc21fc3c986fee94fa9c2837bbd7dbd3303a3a70c9abc014",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.app_logger",
