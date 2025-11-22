@@ -118,6 +118,7 @@ pub fn core_native_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crypto::seal, m)?)?;
     m.add_function(wrap_pyfunction!(crypto::unseal, m)?)?;
     m.add_function(wrap_pyfunction!(integrity::self_check, m)?)?;
+    m.add_function(wrap_pyfunction!(integrity::calculate_sanitized_self_hash, m)?)?;
     m.add_function(wrap_pyfunction!(integrity::calculate_file_sha256, m)?)?;
     m.add_function(wrap_pyfunction!(integrity::calculate_bytes_sha256, m)?)?;
     m.add_function(wrap_pyfunction!(verify_file_hash, m)?)?;

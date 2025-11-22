@@ -48,6 +48,13 @@ pub fn calculate_bytes_sha256(data: &[u8]) -> PyResult<String> {
 }
 
 #[pyfunction]
+pub fn calculate_sanitized_self_hash(path: &str) -> PyResult<String> {
+    let digest = crate::selfhash::sanitized_hash_of_file(Path::new(path))
+        .map_err(|err| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("hash {path}: {err}")))?;
+    Ok(digest)
+}
+
+#[pyfunction]
 pub fn calculate_file_sha256(path: &str) -> PyResult<String> {
     let digest = sha256_of_file(Path::new(path)).map_err(|err| {
         PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("read {path}: {err}"))

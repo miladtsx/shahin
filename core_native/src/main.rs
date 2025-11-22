@@ -456,20 +456,29 @@ fn generate_launch_token() -> String {
 }
 
 fn inherit_bundle_sys_path(_py: Python<'_>, sys: &Bound<'_, PyModule>) -> PyResult<()> {
-    let Ok(raw) = env::var("WIN_SYSPATH") else {
-        return Ok(());
-    };
-    if raw.trim().is_empty() {
-        return Ok(());
-    }
     let sys_path = sys.getattr("path")?.downcast_into::<PyList>()?;
-    for path in env::split_paths(&raw) {
-        if path.as_os_str().is_empty() {
-            continue;
+    // Prefer paths handed over by the PyInstaller stub so the embedded interpreter
+    // can see the same vendored modules. When running the launcher directly in a
+    // dev checkout (no WIN_SYSPATH), fall back to the source root so imports like
+    // `src.detect_vehicle` and `frontend.app` still resolve.
+    if let Ok(raw) = env::var("WIN_SYSPATH") {
+        if !raw.trim().is_empty() {
+            for path in env::split_paths(&raw) {
+                if path.as_os_str().is_empty() {
+                    continue;
+                }
+                let value = path.to_string_lossy();
+                sys_path.insert(0, value.as_ref())?;
+            }
+            return Ok(());
         }
-        let value = path.to_string_lossy();
-        sys_path.insert(0, value.as_ref())?;
     }
+
+    let source_root = Path::new(protected::SOURCE_ROOT);
+    if source_root.exists() {
+        sys_path.insert(0, source_root.to_string_lossy().as_ref())?;
+    }
+
     Ok(())
 }
 

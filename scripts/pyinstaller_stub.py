@@ -33,7 +33,12 @@ def _launcher_candidates() -> Iterable[Path]:
 
     # Allow direct invocation from a development checkout as well.
     repo_root = Path(__file__).resolve().parents[1]
-    yield repo_root / "core_native" / "target" / "release" / exe_name
+    launcher_path = (
+        Path(os.environ["SHAHIN_REPO_ROOT"]).joinpath("core_native", "target", "release", exe_name)
+        if "SHAHIN_REPO_ROOT" in os.environ
+        else repo_root / "core_native" / "target" / "release" / exe_name
+    )
+    yield launcher_path
 
 
 def _resolve_launcher() -> Path:

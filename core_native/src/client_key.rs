@@ -1,5 +1,6 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use sha2::{Digest, Sha256};
+use std::{env, fs};
 
 const SHARD_LEN: usize = 8;
 const SHARD_COUNT: usize = 4;
@@ -149,6 +150,10 @@ fn recover_embedded_key(actual_hash: &str) -> Result<[u8; 32]> {
 }
 
 fn shard_payloads() -> Result<[u64; SHARD_COUNT]> {
+    if let Some(words) = load_payloads_from_exe()? {
+        return Ok(words);
+    }
+
     let shards = [
         payload_from_static(&CLIENT_KEY_SHARD0),
         payload_from_static(&CLIENT_KEY_SHARD1),
@@ -167,6 +172,34 @@ fn shard_payloads() -> Result<[u64; SHARD_COUNT]> {
         out[idx] = u64::from_le_bytes(block);
     }
     Ok(out)
+}
+
+fn load_payloads_from_exe() -> Result<Option<[u64; SHARD_COUNT]>> {
+    let exe = env::current_exe().context("locate current executable")?;
+    let bytes = fs::read(&exe).with_context(|| format!("read {}", exe.display()))?;
+    if let Some(payloads) = payloads_from_blob(&bytes) {
+        let mut out = [0u64; SHARD_COUNT];
+        for (idx, block) in payloads.into_iter().enumerate() {
+            out[idx] = u64::from_le_bytes(block);
+        }
+        return Ok(Some(out));
+    }
+    Ok(None)
+}
+
+fn payloads_from_blob(bytes: &[u8]) -> Option<[[u8; SHARD_LEN]; SHARD_COUNT]> {
+    let mut payloads = [[0u8; SHARD_LEN]; SHARD_COUNT];
+    for (idx, pattern) in embedded_shards().iter().enumerate() {
+        let rel_start = locate(bytes, pattern.start)?;
+        let payload_start = rel_start + pattern.start.len();
+        let rel_end = locate(&bytes[payload_start..], pattern.end)?;
+        let payload_end = payload_start + rel_end;
+        if payload_end - payload_start != SHARD_LEN {
+            return None;
+        }
+        payloads[idx].copy_from_slice(&bytes[payload_start..payload_end]);
+    }
+    Some(payloads)
 }
 
 fn payload_from_static(block: &[u8]) -> [u8; SHARD_LEN] {
@@ -239,8 +272,7 @@ fn derive_mask(hash_hex: &str) -> Result<[u8; 32]> {
     if hash_hex.len() != 64 {
         return Err(anyhow!("launcher hash must be 64 hex characters"));
     }
-    let seed = hex::decode(hash_hex)
-        .map_err(|err| anyhow!("invalid launcher hash hex: {err}"))?;
+    let seed = hex::decode(hash_hex).map_err(|err| anyhow!("invalid launcher hash hex: {err}"))?;
     let mut state = u64::from_le_bytes(seed[0..8].try_into().unwrap());
     let mut mask = [0u8; 32];
     for idx in 0..mask.len() {
@@ -294,15 +326,21 @@ mod tests {
     #[test]
     fn scatter_and_recover_round_trip() {
         let base = [0x11u8; 32];
-        let fragments = scatter_fragments_for_embedding(&base, "00553b2459c656889fc038d899ed162042272a9327efc9b448ed73fe421b4ffc")
-            .expect("scatter");
+        let fragments = scatter_fragments_for_embedding(
+            &base,
+            "00553b2459c656889fc038d899ed162042272a9327efc9b448ed73fe421b4ffc",
+        )
+        .expect("scatter");
         // Emulate runtime path
         let mut words = [0u64; SHARD_COUNT];
         for (idx, frag) in fragments.iter().enumerate() {
             words[idx] = u64::from_le_bytes(*frag);
         }
-        xor_with_mask(&mut words, "00553b2459c656889fc038d899ed162042272a9327efc9b448ed73fe421b4ffc")
-            .expect("mask");
+        xor_with_mask(
+            &mut words,
+            "00553b2459c656889fc038d899ed162042272a9327efc9b448ed73fe421b4ffc",
+        )
+        .expect("mask");
         recover_words(&mut words);
         assert_eq!(words_to_bytes(&words), base);
     }

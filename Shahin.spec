@@ -41,7 +41,7 @@ a = Analysis(
     binaries=[LAUNCHER_BINARY],
 datas=[
         ("frontend/static", "frontend/static"),
-        ("res/main.py.sha256", "res/main.py.sha256"),
+        ("res/main.py.sha256", "res"),
         PROTECTED_DATAS,
     ],
     hiddenimports=hiddenimports,

@@ -17,7 +17,7 @@ pub const PROTECTED_MODULES: &[ProtectedModuleSpec] = &[
         import_name: "main",
         plaintext_path: "main.py",
         encrypted_name: "main.bin",
-        expected_sha256: "c1d9dafca2d0a6c1d572132c2ee30f413bf416ce2c94ad8f18151badf4ff3c38",
+        expected_sha256: "955458ebf937ac0dc0993e9fd96fefb9fa8e899ade85f44ff37df44d401c9902",
     },
     ProtectedModuleSpec {
         import_name: "tray_app",
