@@ -403,7 +403,7 @@ def settings():
 def gen_frames(video_url):
     cap = cv2.VideoCapture(video_url)
     if not cap.isOpened():
-        print(f"ویدئو یافت نشد {video_url}")
+        print(f"No video source found at {video_url}")
         return
 
     while True:

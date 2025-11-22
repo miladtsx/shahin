@@ -62,14 +62,10 @@ def _integrity_target_path() -> str | None:
 
 
 def _check_integrity_and_authorization() -> bool:
-    print("Checking integrity")
     if getattr(sys, "frozen", False) and os.environ.get("SHAHIN_LAUNCH_TOKEN"):
-        print("FROZEN")
 
         entry = os.environ.get("WIN_ENTRY")
         expected = os.environ.get("WIN_INTEGRITY")
-        print(entry)
-        print(expected)
         if not entry or not expected:
             logger.info(
                 "integrity_check_skipped",
@@ -95,7 +91,6 @@ def _check_integrity_and_authorization() -> bool:
                     logger.warning("integrity_guard_blocked", extra={"file": entry})
                     return False
                 actual = hasher(entry)
-                print("Actual", actual)
             except Exception as e:
                 logger.exception(
                     "launcher_integrity_check_failed",
@@ -112,7 +107,6 @@ def _check_integrity_and_authorization() -> bool:
                 "integrity_check_passed", extra={"file": entry, "mode": "launcher"}
             )
     else:
-        print("non FROZEN")
 
         # verify main file hash
         expected = _read_expected_hash()
