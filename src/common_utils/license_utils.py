@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,7 +15,9 @@ from .resource_path import get_data_path
 
 try:
     import core_native  # type: ignore
-except Exception as exc:  # pragma: no cover - tray/backends require native module anyway
+except (
+    Exception
+) as exc:  # pragma: no cover - tray/backends require native module anyway
     raise RuntimeError(f"core_native module is required for licensing: {exc}") from exc
 
 logger = get_logger("licensing")
@@ -31,7 +32,6 @@ class LicenseStatus:
 
 
 _CACHED_FINGERPRINT: Optional[str] = None
-_CACHED_STATUS: Optional[LicenseStatus] = None
 
 
 def get_machine_fingerprint() -> str:
@@ -155,18 +155,11 @@ def _write_license_to_disk(blob: str) -> None:
         json.dump(data, fh, separators=(",", ":"))
 
 
-def license_status(force_reload: bool = False) -> LicenseStatus:
-    global _CACHED_STATUS
-    if not force_reload and _CACHED_STATUS:
-        return _CACHED_STATUS
-
+def license_status() -> LicenseStatus:
     blob = _read_license_from_disk()
     if not blob:
-        status = LicenseStatus(False, "missing_license", None)
-    else:
-        status = verify_license_blob(blob)
-    _CACHED_STATUS = status
-    return status
+        return LicenseStatus(False, "missing_license", None)
+    return verify_license_blob(blob)
 
 
 def license_is_valid() -> bool:
@@ -178,8 +171,7 @@ def activate_license(blob: str) -> LicenseStatus:
     if status.valid:
         try:
             _write_license_to_disk(blob)
-            # refresh cache
-            license_status(force_reload=True)
+            license_status()
         except Exception as exc:
             logger.exception("failed_to_store_license", extra={"error": str(exc)})
             return LicenseStatus(False, "write_failed", None)
@@ -193,8 +185,3 @@ def current_license_summary() -> Optional[dict]:
     payload = status.payload.copy()
     payload.pop("signature", None)
     return payload
-
-
-def remove_cached_license_for_tests() -> None:
-    global _CACHED_STATUS
-    _CACHED_STATUS = None

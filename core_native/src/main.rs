@@ -186,7 +186,7 @@ fn beacon_tick(exe_path: &Path, expected_hash: &str) -> Result<()> {
 
     Python::with_gil(|py| -> Result<()> {
         let license_module = py.import_bound("src.common_utils.license_utils")?;
-        let status = license_module.call_method1("license_status", (true,))?;
+        let status = license_module.call_method1("license_status", ())?;
         enforce_license(&status).map_err(|err| anyhow!(err.to_string()))?;
         Ok(())
     })?;
@@ -420,11 +420,10 @@ fn bootstrap_python(
     }
 
     let license_module = py.import_bound("src.common_utils.license_utils")?;
-    let status = license_module.call_method1("license_status", (true,))?;
+    let status = license_module.call_method1("license_status", ())?;
     enforce_license(&status)?;
 
     let tray_app = py.import_bound("tray_app")?;
-    eprintln!("3");
 
     let args_dict = args.to_pydict(py)?;
     eprintln!(

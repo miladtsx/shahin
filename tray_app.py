@@ -92,7 +92,7 @@ def _spawn_process(mode, extra_args=None):
 
 
 def _license_allows(component):
-    status = license_utils.license_status(force_reload=True)
+    status = license_utils.license_status()
     if status.valid:
         return True
     logger.warning(
@@ -404,7 +404,7 @@ def backend_main(_args: Mapping[str, Any]):
 def dashboard_main(args: Mapping[str, Any]):
     from frontend.app import run_dashboard
 
-    status = license_utils.license_status(force_reload=True)
+    status = license_utils.license_status()
     if not status.valid:
         logger.error(
             "Dashboard blocked: license invalid",

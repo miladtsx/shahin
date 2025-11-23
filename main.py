@@ -147,7 +147,7 @@ def _check_integrity_and_authorization() -> bool:
         logger.exception("fingerprint_failed", extra={"error": str(e)})
         return False
 
-    status = license_utils.license_status(force_reload=True)
+    status = license_utils.license_status()
     if not status.valid:
         logger.error("license_invalid", extra={"reason": status.reason})
         return False

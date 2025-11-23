@@ -490,7 +490,7 @@ def ensure_database():
 
 
 def _require_valid_license():
-    status = license_utils.license_status(force_reload=True)
+    status = license_utils.license_status()
     if not status.valid:
         logger.critical("dashboard_license_invalid", extra={"reason": status.reason})
         raise SystemExit("License invalid or missing. Activate via the tray.")
