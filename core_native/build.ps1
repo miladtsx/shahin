@@ -22,8 +22,8 @@ param(
     # Path to a file that contains the client key (hex). Alternative to ClientKeyHex.
     [string] $ClientKeyFile,
 
-    # Optional identifier to embed inside the manifest for auditing.
-    [string] $ClientId,
+    # Human-friendly client name; used to derive/store client id and key under .keys/clients/.
+    [string] $ClientName,
 
     # Optional: show Cargo’s full stdout/stderr (for debugging).
     [switch] $ShowCargo
@@ -115,6 +115,12 @@ function Generate-ClientKeyHex {
         $rng.Dispose()
     }
     return (-join ($bytes | ForEach-Object { $_.ToString("x2") }))
+}
+
+function Generate-ClientId {
+    param([Parameter(Mandatory)][string]$SafeName)
+    $suffix = ([guid]::NewGuid().ToString('N')).Substring(0,8)
+    return ("{0}-{1}" -f $SafeName, $suffix)
 }
 
 # Run a native tool quietly; surface output only on failure
@@ -308,8 +314,11 @@ Write-Info "pyarmorDir:  $PyArmorOutDir"
 
 $ResolvedClientKey = $null
 $ClientKeyRecordPath = $null
-$ClientKeysDir = Join-Path $root '.keys'
-$safeClientId = $null
+$ClientKeysDir = Join-Path $root '.keys/clients'
+$ClientDir = $null
+$safeClientName = $null
+$ClientIdPath = $null
+$ClientId = $null
 
 if ($ClientKeyHex -and $ClientKeyFile) {
     throw "Specify either -ClientKeyHex or -ClientKeyFile, not both"
@@ -325,41 +334,61 @@ if ($ClientKeyHex) {
     Write-Info "Using explicitly provided client key material"
 }
 
-if ($ClientId) {
-    $ClientId = $ClientId.Trim()
-    if ([string]::IsNullOrWhiteSpace($ClientId)) {
-        throw "ClientId cannot be empty"
-    }
-    $safeClientId = ($ClientId -replace '[^0-9A-Za-z._-]', '_').Trim()
-    if ([string]::IsNullOrWhiteSpace($safeClientId)) {
-        throw "ClientId must contain at least one alphanumeric character"
-    }
-    if (-not (Test-Path -LiteralPath $ClientKeysDir)) {
-        New-Item -ItemType Directory -Force -Path $ClientKeysDir | Out-Null
-    }
-    $ClientKeyRecordPath = Join-Path $ClientKeysDir ("client-{0}.key" -f $safeClientId)
-    if ($ResolvedClientKey) {
-        if (Test-Path -LiteralPath $ClientKeyRecordPath) {
-            $existing = Normalize-ClientKeyHex ((Get-Content -LiteralPath $ClientKeyRecordPath -Raw).Trim())
-            if ($existing -ne $ResolvedClientKey) {
-                throw "Client key file at $ClientKeyRecordPath already exists with different material"
-            }
-            Write-Info "Reusing existing client key for '$ClientId' from $ClientKeyRecordPath"
-        } else {
-            Set-Content -LiteralPath $ClientKeyRecordPath -Value $ResolvedClientKey -NoNewline
-            Write-Info "Stored provided client key for '$ClientId' at $ClientKeyRecordPath"
+if (-not $ClientName) {
+    throw "ClientName is required; provide -ClientName <friendly name>"
+}
+
+$ClientName = $ClientName.Trim()
+if ([string]::IsNullOrWhiteSpace($ClientName)) {
+    throw "ClientName cannot be empty"
+}
+$safeClientName = ($ClientName -replace '[^0-9A-Za-z._-]', '_').Trim()
+if ([string]::IsNullOrWhiteSpace($safeClientName)) {
+    throw "ClientName must contain at least one alphanumeric character"
+}
+if (-not (Test-Path -LiteralPath $ClientKeysDir)) {
+    New-Item -ItemType Directory -Force -Path $ClientKeysDir | Out-Null
+}
+$ClientDir = Join-Path $ClientKeysDir $safeClientName
+if (-not (Test-Path -LiteralPath $ClientDir)) {
+    New-Item -ItemType Directory -Force -Path $ClientDir | Out-Null
+}
+$ClientKeyRecordPath = Join-Path $ClientDir 'client.key'
+$ClientIdPath = Join-Path $ClientDir 'client.id'
+
+if (-not $ClientId -and (Test-Path -LiteralPath $ClientIdPath)) {
+    $ClientId = (Get-Content -LiteralPath $ClientIdPath -Raw).Trim()
+}
+if (-not $ClientId) {
+    $ClientId = Generate-ClientId -SafeName $safeClientName
+    Set-Content -LiteralPath $ClientIdPath -Value $ClientId -NoNewline
+    Write-Info "Generated client id '$ClientId' for '$ClientName' at $ClientIdPath"
+} else {
+    Write-Info "Reusing client id '$ClientId' for '$ClientName' from $ClientIdPath"
+}
+if ($ResolvedClientKey) {
+    if (Test-Path -LiteralPath $ClientKeyRecordPath) {
+        $existing = Normalize-ClientKeyHex ((Get-Content -LiteralPath $ClientKeyRecordPath -Raw).Trim())
+        if ($existing -ne $ResolvedClientKey) {
+            throw "Client key file at $ClientKeyRecordPath already exists with different material"
         }
-    } elseif (Test-Path -LiteralPath $ClientKeyRecordPath) {
-        $stored = Normalize-ClientKeyHex ((Get-Content -LiteralPath $ClientKeyRecordPath -Raw).Trim())
-        $ResolvedClientKey = $stored
         Write-Info "Reusing existing client key for '$ClientId' from $ClientKeyRecordPath"
     } else {
-        $ResolvedClientKey = Generate-ClientKeyHex
         Set-Content -LiteralPath $ClientKeyRecordPath -Value $ResolvedClientKey -NoNewline
-        Write-Info "Generated new client key for '$ClientId' at $ClientKeyRecordPath"
+        Write-Info "Stored provided client key for '$ClientId' at $ClientKeyRecordPath"
     }
-} elseif (-not $ResolvedClientKey) {
-    Write-Info "Building without client-specific key (launcher hash derivation will be used)"
+} elseif (Test-Path -LiteralPath $ClientKeyRecordPath) {
+    $stored = Normalize-ClientKeyHex ((Get-Content -LiteralPath $ClientKeyRecordPath -Raw).Trim())
+    $ResolvedClientKey = $stored
+    Write-Info "Reusing existing client key for '$ClientId' from $ClientKeyRecordPath"
+} else {
+    $ResolvedClientKey = Generate-ClientKeyHex
+    Set-Content -LiteralPath $ClientKeyRecordPath -Value $ResolvedClientKey -NoNewline
+    Write-Info "Generated new client key for '$ClientId' at $ClientKeyRecordPath"
+}
+
+if (-not $ResolvedClientKey) {
+    throw "Client key resolution failed; aborting to avoid launcher-hash fallback"
 }
 
 # --- Refresh expected hashes -----------------------------------------
