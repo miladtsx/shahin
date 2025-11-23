@@ -47,3 +47,7 @@ res/dataset
  dataset
  build
  cache
+
+ self.sha256
+ main.py.sha256
+ 

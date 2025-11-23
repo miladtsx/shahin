@@ -17,6 +17,7 @@ use std::{
     process, thread,
     time::Duration,
 };
+use sysinfo::{Pid, ProcessRefreshKind, RefreshKind, System};
 use walkdir::WalkDir;
 
 const MEMORY_IMPORTER: &str = r#"
@@ -128,8 +129,11 @@ fn run() -> Result<()> {
     if let Some(root) = payload_root.as_ref() {
         env::set_var("WIN_PD", root);
     }
-    let models_dir = stage_protected_assets(&bundle_roots)?;
+    let (models_dir, pyarmor_root, _cache_guard) = stage_protected_assets(&bundle_roots)?;
     env::set_var("WIN_MDL", models_dir.to_string_lossy().as_ref());
+    if let Some(runtime_root) = pyarmor_root {
+        env::set_var("WIN_PYARMOR", runtime_root.to_string_lossy().as_ref());
+    }
 
     let importer_token = generate_launch_token();
     env::set_var("SHAHIN_LAUNCH_TOKEN", &importer_token);
@@ -401,6 +405,11 @@ fn bootstrap_python(
     sys.setattr("executable", exe_path.to_string_lossy().as_ref())?;
     sys.setattr("frozen", true)?;
 
+    if let Ok(pyarmor_root) = env::var("WIN_PYARMOR") {
+        let sys_path = sys.getattr("path")?.downcast_into::<PyList>()?;
+        sys_path.insert(0, pyarmor_root)?;
+    }
+
     // Ensure dev paths remain importable for optional modules.
     if cfg!(debug_assertions) {
         let sys_path = sys.getattr("path")?.downcast_into::<PyList>()?;
@@ -582,12 +591,13 @@ impl LaunchArgs {
     }
 }
 
-fn stage_protected_assets(roots: &[PathBuf]) -> Result<PathBuf> {
-    let cache_dir = env::temp_dir().join(format!("win_mlds_{}", process::id()));
-    if cache_dir.exists() {
-        let _ = fs::remove_dir_all(&cache_dir);
-    }
+fn stage_protected_assets(roots: &[PathBuf]) -> Result<(PathBuf, Option<PathBuf>, CacheGuard)> {
+    // Use a stable shared cache so multiple launcher processes reuse the same assets.
+    let cache_dir = env::temp_dir().join("win_mlds_shared");
     fs::create_dir_all(&cache_dir)?;
+    cleanup_stale_markers(&cache_dir);
+    let cache_guard = CacheGuard::new(&cache_dir)?;
+    let mut pyarmor_root: Option<PathBuf> = None;
 
     for spec in protected::PROTECTED_ASSETS {
         let encrypted = locate_encrypted_payload(roots, spec.encrypted_name);
@@ -598,22 +608,105 @@ fn stage_protected_assets(roots: &[PathBuf]) -> Result<PathBuf> {
         };
         let digest = integrity::sha256_of_bytes(&plaintext);
         if !digest.eq_ignore_ascii_case(spec.expected_sha256) {
-            bail!(
-                "{}: asset digest mismatch (expected {}, got {})",
-                spec.label,
-                spec.expected_sha256,
-                digest
-            );
+            bail!("asset digest mismatch",);
         }
         let filename = Path::new(spec.plaintext_path)
             .file_name()
             .ok_or_else(|| anyhow!("asset {} missing file name", spec.label))?;
-        let target_path = cache_dir.join(filename);
-        fs::write(&target_path, &plaintext)
-            .with_context(|| format!("write {}", target_path.to_string_lossy()))?;
+        let target_path = if let Some(stripped) = spec.plaintext_path.strip_prefix("build/pyarmor/")
+        {
+            pyarmor_root.get_or_insert_with(|| cache_dir.clone());
+            cache_dir.join(stripped)
+        } else {
+            cache_dir.join(filename)
+        };
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        write_if_missing(&target_path, &plaintext, spec.expected_sha256)?;
     }
 
-    Ok(cache_dir)
+    Ok((cache_dir, pyarmor_root, cache_guard))
+}
+
+fn write_if_missing(target_path: &Path, contents: &[u8], expected_hash: &str) -> Result<()> {
+    // If the existing file matches the expected hash, reuse it to avoid races between processes.
+    if target_path.exists() {
+        if let Ok(existing) = fs::read(target_path) {
+            let digest = integrity::sha256_of_bytes(&existing);
+            if digest.eq_ignore_ascii_case(expected_hash) {
+                return Ok(());
+            }
+        }
+    }
+
+    let mut last_err = None;
+    for _ in 0..4 {
+        match fs::write(target_path, contents) {
+            Ok(_) => return Ok(()),
+            Err(err) => {
+                last_err = Some(err);
+                thread::sleep(Duration::from_millis(120));
+            }
+        }
+    }
+
+    Err(anyhow!("write {}", target_path.to_string_lossy())
+        .context(last_err.map(|e| e.to_string()).unwrap_or_default()))
+}
+
+struct CacheGuard {
+    cache_dir: PathBuf,
+    owner_marker: PathBuf,
+}
+
+impl CacheGuard {
+    fn new(cache_dir: &Path) -> Result<Self> {
+        let owner_marker = cache_dir.join(format!(".owner_{}", process::id()));
+        fs::write(&owner_marker, b"")?;
+        Ok(Self {
+            cache_dir: cache_dir.to_path_buf(),
+            owner_marker,
+        })
+    }
+}
+
+impl Drop for CacheGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.owner_marker);
+        cleanup_stale_markers(&self.cache_dir);
+        // Only remove the cache if no other owners are present.
+        if let Ok(entries) = fs::read_dir(&self.cache_dir) {
+            let others = entries
+                .flatten()
+                .any(|e| e.file_name().to_string_lossy().starts_with(".owner_"));
+            if !others {
+                let _ = fs::remove_dir_all(&self.cache_dir);
+            }
+        }
+    }
+}
+
+fn cleanup_stale_markers(cache_dir: &Path) {
+    let kind = RefreshKind::new().with_processes(ProcessRefreshKind::everything());
+    let mut sys = System::new_with_specifics(kind);
+    if let Ok(entries) = fs::read_dir(cache_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !name.starts_with(".owner_") {
+                continue;
+            }
+            let pid_str = name.trim_start_matches(".owner_");
+            if let Ok(pid) = pid_str.parse::<u32>() {
+                sys.refresh_process(Pid::from_u32(pid));
+                if sys.process(Pid::from_u32(pid)).is_none() {
+                    let _ = fs::remove_file(entry.path());
+                }
+            } else {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    }
 }
 
 fn next_value<'a, I>(flag: &str, iter: &mut I) -> Result<String>

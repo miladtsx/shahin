@@ -15,43 +15,91 @@ pub struct ProtectedAssetSpec {
 pub const PROTECTED_MODULES: &[ProtectedModuleSpec] = &[
     ProtectedModuleSpec {
         import_name: "main",
-        plaintext_path: "main.py",
+        plaintext_path: "build/pyarmor/main.py",
         encrypted_name: "main.bin",
-        expected_sha256: "d39a41c89390947cd563ee62509629b952728cd1027fd776a586312c70c7ee23",
+        expected_sha256: "7975acb1af6a8d5852fc8fc5223d19f0352235c73f74b1a8b23d9ec64d0aa21f",
     },
     ProtectedModuleSpec {
         import_name: "tray_app",
-        plaintext_path: "tray_app.py",
+        plaintext_path: "build/pyarmor/tray_app.py",
         encrypted_name: "tray_app.bin",
-        expected_sha256: "c81097704ef7e2c6dc21fc3c986fee94fa9c2837bbd7dbd3303a3a70c9abc014",
+        expected_sha256: "da1248e62ddc97a5c989a11899c5fd5698aab74a7e1357f2c45e3abf804f22dc",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.app_logger",
-        plaintext_path: "src/common_utils/app_logger.py",
+        plaintext_path: "build/pyarmor/app_logger.py",
         encrypted_name: "app_logger.bin",
-        expected_sha256: "077ce75888edc8ae13fc5c039e7bea678350039102e1d494192b3721a6f7bdd8",
+        expected_sha256: "86b0c86f2f951e8478e027217f19f2ee33d6c74a82c3709b3fcefcd6d949c253",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.resource_path",
-        plaintext_path: "src/common_utils/resource_path.py",
+        plaintext_path: "build/pyarmor/resource_path.py",
         encrypted_name: "resource_path.bin",
-        expected_sha256: "d1e89dc903794a03e2f85a8d301c90211b56577951870b94a3ae2cf57484611c",
+        expected_sha256: "1950e9ea0299fa25dce102242009f636ecd31cde68dab4f16dc01762b6388cb8",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.license_utils",
-        plaintext_path: "src/common_utils/license_utils.py",
+        plaintext_path: "build/pyarmor/license_utils.py",
         encrypted_name: "license_utils.bin",
-        expected_sha256: "44a24b915d0ccb02ff18a1d9f710ab470e67307c1cbd33eab3e7c932ee4576f7",
+        expected_sha256: "20a875b6b14a107d59e2c7ea461bd16ac00c4a7cba53c00266aa47662e039cff",
     },
     ProtectedModuleSpec {
         import_name: "src.common_utils.native_guard",
-        plaintext_path: "src/common_utils/native_guard.py",
+        plaintext_path: "build/pyarmor/native_guard.py",
         encrypted_name: "native_guard.bin",
-        expected_sha256: "71f97f5aeb6a50f93de24fdafd131752c0eb6b79e1275965bdffa22a9d493526",
+        expected_sha256: "92093109e7d75afccf6b0e684294bbf0b91613b1b41b7fb4895c20611102a093",
+    },
+    ProtectedModuleSpec {
+        import_name: "src.detectors.plate_detector",
+        plaintext_path: "build/pyarmor/plate_detector.py",
+        encrypted_name: "plate_detector.bin",
+        expected_sha256: "2c435f6371b8f661c86963ba4e5c5b44abb2444c8d7256f958d6d23e3d7d7ae5",
+    },
+    ProtectedModuleSpec {
+        import_name: "src.detectors.vehicle_detector",
+        plaintext_path: "build/pyarmor/vehicle_detector.py",
+        encrypted_name: "vehicle_detector.bin",
+        expected_sha256: "2e95b291608e5f6e7e856fd35c7f1254f876a67c1e60bfca5916803bb323f8f9",
+    },
+    ProtectedModuleSpec {
+        import_name: "src.preprocessor.preprocessor",
+        plaintext_path: "build/pyarmor/preprocessor.py",
+        encrypted_name: "preprocessor.bin",
+        expected_sha256: "eee68516c388eee3010d5c6f0a11a6b31b0a9cdbeeb5a8b8e049ab70a59505fa",
+    },
+    ProtectedModuleSpec {
+        import_name: "src.segmentation.segmentation",
+        plaintext_path: "build/pyarmor/segmentation.py",
+        encrypted_name: "segmentation.bin",
+        expected_sha256: "8f55020a3b292db5532ede671682f18b91a6856404902c1dab7f0d90530a4daa",
+    },
+    ProtectedModuleSpec {
+        import_name: "src.selector.best_frame_selector",
+        plaintext_path: "build/pyarmor/best_frame_selector.py",
+        encrypted_name: "best_frame_selector.bin",
+        expected_sha256: "ad16c6eee2a024c1a86a2f4a26e5f6427cc679ed04496c6a123094b11867c0fe",
+    },
+    ProtectedModuleSpec {
+        import_name: "src.detect_vehicle",
+        plaintext_path: "build/pyarmor/detect_vehicle.py",
+        encrypted_name: "detect_vehicle.bin",
+        expected_sha256: "6c3e63f751298f85ac6fdfc097dd0089ceba2a888f30329139b8ebed8c130460",
     },
 ];
 
 pub const PROTECTED_ASSETS: &[ProtectedAssetSpec] = &[
+    ProtectedAssetSpec {
+        label: "pyarmor_runtime_000000/__init__.py",
+        plaintext_path: "build/pyarmor/pyarmor_runtime_000000/__init__.py",
+        encrypted_name: "pyarmor_runtime_000000/__init__.py.bin",
+        expected_sha256: "88dafd1e125f9034663af4d14b7f5150eec96e72e3e5342bfc0b5eda030029bd",
+    },
+    ProtectedAssetSpec {
+        label: "pyarmor_runtime_000000/pyarmor_runtime.pyd",
+        plaintext_path: "build/pyarmor/pyarmor_runtime_000000/pyarmor_runtime.pyd",
+        encrypted_name: "pyarmor_runtime_000000/pyarmor_runtime.pyd.bin",
+        expected_sha256: "befecc52559898c92f386269487a01e89c3532b81787e62ce1a2034f8dc4fdb3",
+    },
     ProtectedAssetSpec {
         label: "alphabet_classifier_yolov8n.pt",
         plaintext_path: "res/models/alphabet_classifier_yolov8n.pt",

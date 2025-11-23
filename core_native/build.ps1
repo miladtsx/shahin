@@ -13,6 +13,9 @@ param(
     # Where to drop the sealed/protected artifacts.
     [string] $OutDir,
 
+    # Optional: override PyArmor output directory (default: build/pyarmor).
+    [string] $PyArmorOutDir,
+
     # Optional hex-encoded 32-byte client key for per-client sealing.
     [string] $ClientKeyHex,
 
@@ -48,6 +51,59 @@ function Normalize-ClientKeyHex {
         throw "Client key material must contain only hexadecimal characters"
     }
     return $trimmed.ToLowerInvariant()
+}
+
+function Ensure-PyArmorAvailable {
+    $pyarmor = Get-Command 'pyarmor' -ErrorAction SilentlyContinue
+    if (-not $pyarmor) {
+        throw "PyArmor not found. Install it in your build env (e.g., 'pip install pyarmor')."
+    }
+    return $pyarmor.Source
+}
+
+function Invoke-PyArmorObfuscation {
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$OutputDir
+    )
+
+    $pyarmorCmd = Ensure-PyArmorAvailable
+    if (Test-Path -LiteralPath $OutputDir) {
+        Remove-Item -LiteralPath $OutputDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+
+    $pythonInputs = @(
+        'main.py',
+        'tray_app.py',
+        'src/common_utils/app_logger.py',
+        'src/common_utils/resource_path.py',
+        'src/common_utils/license_utils.py',
+        'src/common_utils/native_guard.py',
+        'src/detectors/plate_detector.py',
+        'src/detectors/vehicle_detector.py',
+        'src/preprocessor/preprocessor.py',
+        'src/segmentation/segmentation.py',
+        'src/selector/best_frame_selector.py',
+        'src/detect_vehicle.py'
+    )
+
+    $args = @('gen', '-O', $OutputDir)
+    foreach ($input in $pythonInputs) {
+        $args += $input
+    }
+
+    Write-Stage "Obfuscate Python payloads (PyArmor)"
+    Write-Info "pyarmor: $pyarmorCmd"
+    Push-Location $Root
+    try {
+        & $pyarmorCmd @args
+        if ($LASTEXITCODE -ne 0) {
+            throw "pyarmor failed with exit code $LASTEXITCODE"
+        }
+    } finally {
+        Pop-Location
+    }
 }
 
 function Generate-ClientKeyHex {
@@ -185,12 +241,14 @@ function Update-MainHashFile {
     param(
         [Parameter(Mandatory)][string]$MainPath,
         [Parameter(Mandatory)][string]$HashPath,
-        [hashtable]$KnownHashes
+        [hashtable]$KnownHashes,
+        [string]$KnownKey
     )
 
     $digest = $null
-    if ($KnownHashes -and $KnownHashes.ContainsKey('main.py')) {
-        $digest = $KnownHashes['main.py']
+    $lookupKey = if ($KnownKey) { $KnownKey } else { 'main.py' }
+    if ($KnownHashes -and $KnownHashes.ContainsKey($lookupKey)) {
+        $digest = $KnownHashes[$lookupKey]
     } else {
         $digest = Compute-FileSha256 -Path $MainPath
     }
@@ -222,7 +280,13 @@ $nativeDir = Join-Path $root 'core_native'
 
 if (-not $OutDir -or [string]::IsNullOrWhiteSpace($OutDir)) {
     $OutDir = Join-Path $root 'build/protected'
+}
+if (-not $PyArmorOutDir -or [string]::IsNullOrWhiteSpace($PyArmorOutDir)) {
+    $PyArmorOutDir = Join-Path $root 'build/pyarmor'
 } else {
+    $PyArmorOutDir = [System.IO.Path]::GetFullPath($PyArmorOutDir)
+}
+if (-not [System.IO.Path]::IsPathRooted($OutDir)) {
     $OutDir = [System.IO.Path]::GetFullPath($OutDir)
 }
 
@@ -234,10 +298,13 @@ $embedTool  = Join-Path $releaseDir 'embedhash.exe'
 $embedKeyExe = Join-Path $releaseDir 'embedkey.exe'
 $protectExe = Join-Path $releaseDir 'protect.exe'
 $protectedDir = Join-Path $nativeDir 'protected'
+$pyArmorMain = Join-Path $PyArmorOutDir 'main.py'
+$pyArmorLabel = 'build/pyarmor/main.py'
 
 Write-Info "root:        $root"
 Write-Info "nativeDir:   $nativeDir"
 Write-Info "outDir:      $OutDir"
+Write-Info "pyarmorDir:  $PyArmorOutDir"
 
 $ResolvedClientKey = $null
 $ClientKeyRecordPath = $null
@@ -296,10 +363,12 @@ if ($ClientId) {
 }
 
 # --- Refresh expected hashes -----------------------------------------
+Invoke-PyArmorObfuscation -Root $root -OutputDir $PyArmorOutDir
+
 Write-Stage "Refresh expected hashes"
 $protectedRsPath = Join-Path $nativeDir 'src/protected.rs'
 $hashMap = Update-ProtectedExpectedHashes -ProtectedRsPath $protectedRsPath -RepoRoot $root
-Update-MainHashFile -MainPath (Join-Path $root 'main.py') -HashPath (Join-Path $root 'res/main.py.sha256') -KnownHashes $hashMap
+Update-MainHashFile -MainPath $pyArmorMain -HashPath (Join-Path $root 'res/main.py.sha256') -KnownHashes $hashMap -KnownKey $pyArmorLabel
 
 # --- Clean previous artifacts (optional) ------------------------------
 Write-Stage "Clean previous artifacts (if any)"

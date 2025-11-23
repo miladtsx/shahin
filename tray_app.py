@@ -1,7 +1,9 @@
 import os
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import webbrowser
 from pathlib import Path
 import threading
@@ -150,8 +152,21 @@ def stop_all(icon_obj=None, item=None):
     logger.info("Stopping all components")
     stop_dashboard()
     stop_backend()
+    _clear_model_cache()
     if icon_obj:
         icon_obj.stop()
+
+
+def _clear_model_cache():
+    root = os.environ.get("WIN_MDL") or str(
+        Path(tempfile.gettempdir()) / "win_mlds_shared"
+    )
+    cache_path = Path(root)
+    try:
+        if cache_path.exists():
+            shutil.rmtree(cache_path, ignore_errors=False)
+    except Exception as exc:
+        pass
 
 
 def _stop_process(name):
