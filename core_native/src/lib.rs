@@ -112,7 +112,13 @@ fn to_lower_hex(bytes: &[u8]) -> String {
 
 #[pymodule(name = "core_native")]
 pub fn core_native_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<licensing::LicenseStatus>()?;
     m.add_function(wrap_pyfunction!(licensing::verify_signed_blob, m)?)?;
+    m.add_function(wrap_pyfunction!(licensing::verify_license_blob_py, m)?)?;
+    m.add_function(wrap_pyfunction!(licensing::license_status_py, m)?)?;
+    m.add_function(wrap_pyfunction!(licensing::license_is_valid_py, m)?)?;
+    m.add_function(wrap_pyfunction!(licensing::activate_license_py, m)?)?;
+    m.add_function(wrap_pyfunction!(licensing::current_license_summary_py, m)?)?;
     m.add_function(wrap_pyfunction!(licensing::sign_license_payload, m)?)?;
     m.add_function(wrap_pyfunction!(derive_hwid, m)?)?;
     m.add_function(wrap_pyfunction!(crypto::seal, m)?)?;

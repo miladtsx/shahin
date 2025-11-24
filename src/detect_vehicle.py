@@ -1,5 +1,6 @@
 import cv2
 import time
+import random
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, Sequence
 
@@ -9,6 +10,8 @@ from src.common_utils.app_logger import get_logger
 from src.common_utils.config import Config, MyConfig
 from src.common_utils.debug_image import draw_boxes, show
 from src.common_utils.resource_path import get_resource_path
+from src.common_utils import license_utils
+import core_native  # type: ignore
 from src.common_utils.video_loader import VideoLoader
 from src.db.sqlite import DB
 from src.detectors.plate_detector import PlateDetector
@@ -35,6 +38,8 @@ class DetectionRuntimeState:
     hot_zone_def: Optional[Sequence[Dict[str, float]]]
     car_detection_threshold: Optional[float]
     plate_detection_threshold: Optional[float]
+    license_gate: "LicenseGate"
+    integrity_probe: "IntegrityProbe"
     hot_zone_mask: Optional[np.ndarray] = None
     cached_mask_shape: Optional[Tuple[int, int]] = None
     rotation_cache: Dict[str, Optional[object]] = field(
@@ -47,6 +52,50 @@ class FrameProcessingResult:
     frame: np.ndarray
     roi: np.ndarray
     frame_index: int
+
+
+class LicenseGate:
+    """
+    Cheap, jittered license gate for hot paths. Avoids per-frame native calls but
+    still trips frequently enough to make patching painful.
+    """
+
+    def __init__(self, min_interval: float = 0.8, max_interval: float = 2.4):
+        self._next_check = 0.0
+        self._min = min_interval
+        self._max = max_interval
+
+    def check(self) -> None:
+        now = time.perf_counter()
+        if now < self._next_check:
+            return
+        status = license_utils.license_status()
+        if not getattr(status, "valid", False):
+            reason = getattr(status, "reason", "invalid")
+            raise PermissionError(f"license invalid: {reason}")
+        # schedule the next check with a small random jitter to frustrate patch timing
+        self._next_check = now + random.uniform(self._min, self._max)
+
+
+class IntegrityProbe:
+    """
+    Lightweight integrity probe that runs periodically with jitter to avoid
+    deterministic bypass timing. Uses the native self_check, which is cheap.
+    """
+
+    def __init__(self, min_interval: float = 6.0, max_interval: float = 15.0):
+        self._next_check = 0.0
+        self._min = min_interval
+        self._max = max_interval
+
+    def check(self) -> None:
+        now = time.perf_counter()
+        if now < self._next_check:
+            return
+        ok = core_native.self_check()
+        if not ok:
+            raise PermissionError("integrity probe failed")
+        self._next_check = now + random.uniform(self._min, self._max)
 
 
 def run_plate_detection():
@@ -101,6 +150,8 @@ def build_runtime_state(conf: MyConfig) -> DetectionRuntimeState:
         hot_zone_def=conf.get("hot_zone"),  # type: ignore
         car_detection_threshold=conf.get("car_detection_threshold"),
         plate_detection_threshold=conf.get("plate_detection_threshold"),
+        license_gate=LicenseGate(),
+        integrity_probe=IntegrityProbe(),
     )
 
 
@@ -109,11 +160,16 @@ def continuous_detection_loop(
 ):
     while True:
         try:
+            state.license_gate.check()
+            state.integrity_probe.check()
             loader = create_video_loader(conf)
             process_video_stream(loader, components, state)
         except KeyboardInterrupt:
             logger.info("Received shutdown signal, stopping gracefully...")
             break
+        except PermissionError as exc:
+            logger.error(f"License enforcement triggered: {exc}")
+            raise
         except Exception as e:
             logger.error(f"Video processing failed: {e}")
             logger.info("Restarting video processing in 1 seconds...")
@@ -138,6 +194,8 @@ def process_video_stream(
 ):
     frame_index = 0
     for frame in loader:
+        state.license_gate.check()
+        state.integrity_probe.check()
         try:
             result, frame_index = process_frame(frame, frame_index, components, state)
             if result is None:
@@ -182,6 +240,8 @@ def process_video_stream(
                 )
 
             finalize_tracks(components.selector, active_ids, frame_index, active_boxes)
+        except PermissionError:
+            raise
         except Exception as e:
             logger.error(f"Error processing frame {frame_index}: {e}")
             continue
