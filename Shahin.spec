@@ -42,6 +42,7 @@ a = Analysis(
 datas=[
         ("frontend/static", "frontend/static"),
         ("res/main.py.sha256", "res"),
+        ("res/icon.ico", "icon"),
         PROTECTED_DATAS,
     ],
     hiddenimports=hiddenimports,
@@ -66,12 +67,13 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon="res/icon.ico",
 )
 
 coll = COLLECT(

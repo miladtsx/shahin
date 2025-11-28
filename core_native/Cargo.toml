@@ -52,4 +52,5 @@ winreg = "0.55"
 rustflags = [
   "-Clink-arg=/Brepro",
   "-Clink-arg=/incremental:no",
+  "-Clink-arg=/SUBSYSTEM:WINDOWS",
 ]
