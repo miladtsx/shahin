@@ -8,12 +8,13 @@ import webbrowser
 from pathlib import Path
 import threading
 from typing import Any, Dict, Mapping, Optional
+import yaml
 
 from pystray import Icon, Menu, MenuItem
 from PIL import Image, ImageDraw
 
 from src.common_utils.app_logger import get_logger
-from src.common_utils.resource_path import get_resource_path
+from src.common_utils.resource_path import get_data_path, get_resource_path
 from src.common_utils import license_utils
 
 BACKEND = "backend"
@@ -34,6 +35,7 @@ tray_config = {
 }
 
 logger = get_logger("tray.app")
+_config_watcher = None
 
 
 def _normalize_args(raw: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
@@ -61,6 +63,72 @@ def _normalize_args(raw: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     dashboard_url = base.get("dashboard_url")
     base["dashboard_url"] = str(dashboard_url) if dashboard_url else None
     return base
+
+
+class ConfigWatcher:
+    """Watch the user config for video source changes and trigger a backend restart."""
+
+    def __init__(self, path: str, on_video_change, poll_interval: float = 1.0):
+        self.path = path
+        self._on_video_change = on_video_change
+        self._poll_interval = poll_interval
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run, name="config-watcher", daemon=True
+        )
+        self._last_mtime: Optional[float] = None
+        self._last_video_path: Optional[str] = None
+
+    def start(self):
+        if not self._thread.is_alive():
+            self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        self._thread.join(timeout=2)
+
+    def _load_video_path(self) -> Optional[str]:
+        try:
+            with open(self.path, "r") as f:
+                conf = yaml.safe_load(f) or {}
+            return conf.get("video_path")
+        except FileNotFoundError:
+            return None
+        except Exception as exc:
+            logger.warning("config_watch_read_failed", extra={"error": str(exc)})
+            return None
+
+    def _run(self):
+        while not self._stop.is_set():
+            try:
+                mtime = os.path.getmtime(self.path)
+            except OSError:
+                if self._stop.wait(self._poll_interval):
+                    return
+                continue
+
+            if self._last_mtime is None:
+                self._last_mtime = mtime
+                self._last_video_path = self._load_video_path()
+            elif mtime > self._last_mtime:
+                new_video = self._load_video_path()
+                if new_video != self._last_video_path:
+                    self._last_video_path = new_video
+                    logger.info(
+                        "video_source_changed",
+                        extra={"video_path": new_video},
+                    )
+                    try:
+                        self._on_video_change(new_video)
+                    except Exception as exc:
+                        logger.exception(
+                            "video_source_restart_failed",
+                            extra={"error": str(exc)},
+                        )
+                self._last_mtime = mtime
+
+            if self._stop.wait(self._poll_interval):
+                return
 
 
 def build_command(mode, extra_args=None):
@@ -119,6 +187,15 @@ def stop_backend():
     _stop_process(BACKEND)
 
 
+def _restart_backend_for_video_change(new_video_path: Optional[str]):
+    logger.info(
+        "Restarting backend to apply new video source",
+        extra={"video_path": new_video_path},
+    )
+    stop_backend()
+    start_backend()
+
+
 def start_dashboard(open_browser=True, url=None):
     if DASHBOARD in processes and processes[DASHBOARD].poll() is None:
         if open_browser:
@@ -150,6 +227,7 @@ def stop_dashboard():
 
 def stop_all(icon_obj=None, item=None):
     logger.info("Stopping all components")
+    _stop_config_watcher()
     stop_dashboard()
     stop_backend()
     _clear_model_cache()
@@ -336,6 +414,27 @@ def _open_activation_dialog(reason=None):
     threading.Thread(target=_launch, name="activation-dialog", daemon=True).start()
 
 
+def _config_path() -> str:
+    return get_data_path("config.yaml")
+
+
+def _start_config_watcher():
+    global _config_watcher
+    if _config_watcher:
+        return
+    watcher = ConfigWatcher(_config_path(), _restart_backend_for_video_change)
+    _config_watcher = watcher
+    watcher.start()
+
+
+def _stop_config_watcher():
+    global _config_watcher
+    watcher = _config_watcher
+    _config_watcher = None
+    if watcher:
+        watcher.stop()
+
+
 def tray_main(args: Mapping[str, Any]):
     global icon
     global tray_config
@@ -376,6 +475,7 @@ def tray_main(args: Mapping[str, Any]):
     )
 
     icon = Icon("ShahinApp", _create_image(), "شاهین", menu)
+    _start_config_watcher()
 
     if not args["no_autostart"]:
         if license_utils.license_is_valid():
