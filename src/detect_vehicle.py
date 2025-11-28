@@ -218,7 +218,8 @@ def process_video_stream(
             if not tracked_vehicles:
                 continue
 
-            display_tracked_vehicles(result.frame, tracked_vehicles)
+            # Debug only
+            # display_tracked_vehicles(result.frame, tracked_vehicles)
 
             active_boxes = get_active_boxes(tracked_vehicles)
             vehicle_crops, crop_meta, active_ids = collect_vehicle_crops(
