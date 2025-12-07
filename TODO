@@ -9,3 +9,7 @@
 [] cpu vs gpu, how to tell the difference?
 [] protect ai models as well as the code.
 [] protect the license from pc time tampering. (securely and obfuscated and non intrusively)
+[] First run, show onboarding to setup the app 
+[] Move gear to top buttons
+[] swap (yes/no) button colors 
+[] scan for an active rsvp port 
