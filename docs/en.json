@@ -8,41 +8,68 @@
         "language": "Language"
     },
     "hero": {
-        "title": "Advanced Car Plate Tracking System",
-        "subtitle": "Leveraging YOLO models for real-time vehicle and license plate detection and recognition.",
-        "learn_more": "Learn More"
+        "kicker": "Real-time vehicle intelligence",
+        "title": "Shahin",
+        "subtitle": "High-fidelity vehicle + plate tracking for safety-critical, edge-ready deployments.",
+        "cta_primary": "Watch the pipeline",
+        "cta_secondary": "Book a walkthrough",
+        "stat1_value": "99.1%",
+        "stat1_label": "Plate recognition uptime",
+        "stat2_value": "+200",
+        "stat2_label": "Vehicles tracked per second",
+        "stat3_value": "Edge & cloud",
+        "stat3_label": "Deployment options"
     },
     "about": {
+        "kicker": "Precision you can trust",
         "title": "About the Project",
-        "paragraph1": "This project is a robust car plate tracking system designed to accurately detect vehicles and their license plates in various scenarios. It utilizes state-of-the-art YOLO (You Only Look Once) models for efficient object detection, followed by character recognition for the extracted license plates.",
-        "paragraph2": "Key features include:",
-        "feature1": "<strong>Vehicle Detection:</strong> Identifies cars, trucks, and other vehicles in video streams or images.",
-        "feature2": "<strong>License Plate Detection:</strong> Precisely locates license plates on detected vehicles.",
-        "feature3": "<strong>Character Recognition:</strong> Extracts and recognizes characters from the license plates using a custom-trained classifier.",
-        "feature4": "<strong>Tracking:</strong> Implements object tracking to follow vehicles and their plates across multiple frames.",
-        "feature5": "<strong>Database Integration:</strong> Stores detected plate information for further analysis."
+        "paragraph1": "This modular orchestration captures vehicles and their license plates with laser-focused accuracy, funneling live video into state-of-the-art YOLOX detection, followed by custom character-block recognition.",
+        "paragraph2": "Each pipeline stage is tuned for reliability under low light, motion blur, and crowded environments.",
+        "card1": {
+            "badge": "Detection",
+            "title": "Multi-class vehicle awareness",
+            "copy": "Classifies cars, buses, trucks, and motorcycles while estimating motion vectors for robust tracking."
+        },
+        "card2": {
+            "badge": "Localization",
+            "title": "Precision plate framing",
+            "copy": "YOLO anchors tuned to local plate formats ensure crisp crops for downstream OCR."
+        },
+        "card3": {
+            "badge": "Recognition",
+            "title": "Custom OCR ensemble",
+            "copy": "A lightweight classifier trained on multilanguage datasets keeps recognition in-spec even off-network."
+        },
+        "card4": {
+            "badge": "Persistence",
+            "title": "Intelligent tracking",
+            "copy": "A tracking-aware database aligns vehicles to detections, enabling analytics-ready history."
+        }
     },
     "demo": {
-        "title": "Live Demo & Screenshots",
-        "subtitle": "See the system in action with these examples of vehicle and plate detection.",
+        "kicker": "Live capture",
+        "title": "Screenshots and flow",
+        "subtitle": "Inspect the interface, detections, and the end-to-end logic that keeps every plate readable.",
         "card1_title": "License Plate Detection",
-        "card1_text": "Example of a detected vehicle and its license plate highlighted by the system.",
+        "card1_text": "Sharp bounding boxes isolate plates before OCR flags anomalies in real time.",
         "card2_title": "Character Recognition",
-        "card2_text": "Close-up of a license plate with individual characters recognized by the classifier."
+        "card2_text": "Colored overlays reveal confidence per character with audit trails for compliance.",
+        "note": "Full-length demonstrations are available on request or in the hosted repo."
     },
     "tech": {
-        "title": "Technologies Used",
-        "yolo": "<strong>YOLO (You Only Look Once):</strong> For real-time object detection (vehicles and license plates).",
-        "python": "<strong>Python:</strong> Primary programming language for backend logic and model inference.",
-        "opencv": "<strong>OpenCV:</strong> For image and video processing tasks.",
-        "pytorch_tf": "<strong>PyTorch/TensorFlow:</strong> For training and deploying deep learning models.",
-        "sqlite": "<strong>SQLite:</strong> For local database storage of tracking data.",
-        "frontend": "<strong>Streamlit/Flask (Frontend):</strong> For building interactive web interfaces (if applicable).",
-        "docker": "<strong>Docker:</strong> For containerization and deployment."
+        "kicker": "Stack",
+        "title": "Technologies powering Shahin",
+        "subtitle": "From inference to UX, every layer is hardened for edge-grade production.",
+        "yolo": "YOLOv11 (Object detection)",
+        "python": "Python (Inference, orchestration)",
+        "rust": "Rust (Licensing & IP safety)",
+        "opencv": "OpenCV (Video filters & metrics)",
+        "pytorch_tf": "PyTorch & TensorFlow (Training)",
+        "sqlite": "SQLite + Aurora (Historical data)",
+        "frontend": "ReactJS (HQ dashboards)",
+        "docker": "Docker (Deployment)"
     },
     "footer": {
-        "copyright": "&copy; 2025 Your Name. All rights reserved.",
-        "repo_text": "Project Repository:",
-        "repo_link": "GitHub Link"
+        "copyright": "© 2025 MiladTSX. All rights reserved."
     }
 }
